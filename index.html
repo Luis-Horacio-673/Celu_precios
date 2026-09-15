@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Verificador de Precios</title>
+  <!-- Librería ligera para leer códigos de barra -->
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <style>
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { margin: 0; padding: 15px; background: #f0f2f5; display: flex; flex-direction: column; align-items: center; }
+    
+    header { width: 100%; max-width: 420px; text-align: center; margin-bottom: 15px; }
+    .store-badge { display: inline-block; background: #0056b3; color: #fff; padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; font-weight: bold; }
+    
+    #reader-container { width: 100%; max-width: 420px; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.08); padding: 10px; }
+    #reader { width: 100%; border-radius: 8px; overflow: hidden; }
+
+    /* Modal / Pantalla de Resultados */
+    #result-view { display: none; width: 100%; max-width: 420px; margin-top: 15px; }
+    .card { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 6px 16px rgba(0,0,0,0.1); text-align: center; }
+    
+    /* Fase 1: Imagen del producto (3s) */
+    .product-img { max-width: 220px; max-height: 220px; object-fit: contain; margin: 0 auto; display: block; }
+    .timer-bar { height: 4px; background: #e0e0e0; border-radius: 2px; margin-top: 15px; overflow: hidden; }
+    .timer-fill { height: 100%; background: #0056b3; width: 100%; animation: countdown 3s linear forwards; }
+    @keyframes countdown { from { width: 100%; } to { width: 0%; } }
+
+    /* Fase 2: Etiqueta de Precios Oficial */
+    .label-box { border: 2px solid #222; border-radius: 6px; padding: 12px; text-align: left; background: #fff; }
+    .label-title { font-weight: 700; font-size: 1.05rem; margin-bottom: 8px; text-transform: uppercase; }
+    .label-price { font-size: 2.8rem; font-weight: 900; margin: 10px 0; letter-spacing: -1px; }
+    .label-tax { font-size: 0.82rem; color: #444; font-weight: 600; text-transform: uppercase; }
+    .label-sub { font-size: 0.82rem; color: #555; margin-top: 4px; }
+    .btn-reset { margin-top: 15px; width: 100%; background: #111; color: #fff; border: none; padding: 12px; border-radius: 8px; font-weight: bold; font-size: 1rem; cursor: pointer; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div id="sucursal-tag" class="store-badge">Cargando sucursal...</div>
+  </header>
+
+  <!-- Lector de Cámara -->
+  <div id="reader-container">
+    <div id="reader"></div>
+    <p style="text-align:center; font-size: 0.8rem; color: #666; margin: 8px 0 0 0;">Apunta al código de barras del producto</p>
+  </div>
+
+  <!-- Vista de Producto -->
+  <div id="result-view">
+    <!-- Paso 1: Foto 3s -->
+    <div id="step-image" class="card">
+      <h3 id="step1-name" style="margin-top:0;"></h3>
+      <img id="product-photo" class="product-img" src="" alt="Producto">
+      <div class="timer-bar"><div class="timer-fill"></div></div>
+      <p style="font-size:0.75rem; color:#888; margin-top:8px;">Mostrando precio en 3 segundos...</p>
+    </div>
+
+    <!-- Paso 2: Etiqueta Oficial de Precio -->
+    <div id="step-label" class="card" style="display: none;">
+      <div class="label-box">
+        <div id="lbl-title" class="label-title"></div>
+        <div id="lbl-price" class="label-price"></div>
+        <div id="lbl-tax" class="label-tax"></div>
+        <div id="lbl-sub" class="label-sub"></div>
+        <div style="font-size:0.75rem; color:#777; margin-top: 8px; border-top: 1px dashed #ccc; padding-top: 4px;">
+          ORIGEN: Argentina | <span id="lbl-code"></span>
+        </div>
+      </div>
+      <button class="btn-reset" onclick="reiniciarEscaneo()">Escanear otro producto</button>
+    </div>
+  </div>
+
+  <script>
+    // 1. Detección de Sucursal vía URL (?sucursal=...)
+    const params = new URLSearchParams(window.location.search);
+    const sucursal = params.get('sucursal') || "Coto, suc Palermo";
+    document.getElementById('sucursal-tag').innerText = "📍 " + sucursal;
+
+    // 2. Base de Datos de Prueba (Datos extraídos de las fotos)
+    const DB_PRODUCTOS = {
+      "7798061192071": {
+        nombre: "Aceite de oliva OLIOVITA genovesa 500gr BOT-500-ml",
+        precioFinal: "$ 20.250",
+        sinImpuestos: "PRECIO SIN IMPUESTOS NACIONALES: $16.735,54",
+        detalleUnidad: "PRECIO X LT: $40.500",
+        imagen: "https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=500&q=80"
+      },
+      "7792335000321": {
+        nombre: "HUEVO AVICOPER BLANCO CJA 6 UN. CARTON",
+        precioFinal: "$ 2.450",
+        sinImpuestos: "PRECIO SIN IMPUESTOS NACIONALES: $ 2.024,79",
+        detalleUnidad: "PRECIO X UNIDAD: $408,33",
+        imagen: "https://images.unsplash.com/photo-1506976785307-8732e854ad03?w=500&q=80"
+      },
+      "7790503199112": {
+        nombre: "Arroz doble DOS HERMANOS 1kg BSA-1000-gr",
+        precioFinal: "$ 3.650",
+        sinImpuestos: "PRECIO SIN IMPUESTOS NACIONALES: $3.016,53",
+        detalleUnidad: "PRECIO X KG: $3.650",
+        imagen: "https://images.unsplash.com/photo-1586201375761-83865001e31c?w=500&q=80"
+      }
+    };
+
+    let html5QrCode;
+    let timerTransition;
+
+    function onScanSuccess(decodedText) {
+      if (DB_PRODUCTOS[decodedText]) {
+        // Pausar la cámara al detectar
+        html5QrCode.pause();
+        mostrarProducto(DB_PRODUCTOS[decodedText], decodedText);
+      } else {
+        alert("Código no registrado: " + decodedText);
+      }
+    }
+
+    function mostrarProducto(prod, codigo) {
+      document.getElementById('reader-container').style.display = 'none';
+      document.getElementById('result-view').style.display = 'block';
+      document.getElementById('step-image').style.display = 'block';
+      document.getElementById('step-label').style.display = 'none';
+
+      // Cargar datos Paso 1 (Foto)
+      document.getElementById('step1-name').innerText = prod.nombre;
+      document.getElementById('product-photo').src = prod.imagen;
+
+      // Cargar datos Paso 2 (Etiqueta Oficial)
+      document.getElementById('lbl-title').innerText = prod.nombre;
+      document.getElementById('lbl-price').innerText = prod.precioFinal;
+      document.getElementById('lbl-tax').innerText = prod.sinImpuestos;
+      document.getElementById('lbl-sub').innerText = prod.detalleUnidad;
+      document.getElementById('lbl-code').innerText = "EAN: " + codigo;
+
+      // Temporizador de 3 segundos
+      timerTransition = setTimeout(() => {
+        document.getElementById('step-image').style.display = 'none';
+        document.getElementById('step-label').style.display = 'block';
+      }, 3000);
+    }
+
+    function reiniciarEscaneo() {
+      clearTimeout(timerTransition);
+      document.getElementById('result-view').style.display = 'none';
+      document.getElementById('reader-container').style.display = 'block';
+      html5QrCode.resume();
+    }
+
+    // Inicializar Cámara al cargar
+    window.addEventListener('DOMContentLoaded', () => {
+      html5QrCode = new Html5Qrcode("reader");
+      html5QrCode.start(
+        { facingMode: "environment" }, // Cámara trasera
+        { fps: 15, qrbox: { width: 280, height: 180 } },
+        onScanSuccess
+      ).catch(err => console.error("Error al abrir cámara:", err));
+    });
+  </script>
+</body>
+</html>
