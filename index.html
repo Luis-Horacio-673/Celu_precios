@@ -103,13 +103,16 @@
       }
     };
 
-    let html5QrCode;
+let html5QrCode;
     let timerTransition;
+    let isProcessing = false; // Bandera para evitar lecturas duplicadas
 
     function onScanSuccess(decodedText) {
+      // Si ya está mostrando un producto, ignorar nuevas lecturas
+      if (isProcessing) return;
+
       if (DB_PRODUCTOS[decodedText]) {
-        // Pausar la cámara al detectar
-        html5QrCode.pause();
+        isProcessing = true; // Bloqueamos el escáner
         mostrarProducto(DB_PRODUCTOS[decodedText], decodedText);
       } else {
         alert("Código no registrado: " + decodedText);
@@ -117,6 +120,7 @@
     }
 
     function mostrarProducto(prod, codigo) {
+      // Ocultar el recuadro de la cámara y mostrar el resultado
       document.getElementById('reader-container').style.display = 'none';
       document.getElementById('result-view').style.display = 'block';
       document.getElementById('step-image').style.display = 'block';
@@ -142,9 +146,14 @@
 
     function reiniciarEscaneo() {
       clearTimeout(timerTransition);
+      // Ocultamos la ficha del producto y volvemos a mostrar el visor
       document.getElementById('result-view').style.display = 'none';
       document.getElementById('reader-container').style.display = 'block';
-      html5QrCode.resume();
+      
+      // Reactivamos la posibilidad de escanear tras medio segundo
+      setTimeout(() => {
+        isProcessing = false;
+      }, 500);
     }
 
     // Inicializar Cámara al cargar
