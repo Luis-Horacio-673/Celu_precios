@@ -8,22 +8,23 @@
   <script src="https://unpkg.com/html5-qrcode"></script>
   <style>
     * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { margin: 0; padding: 15px; background: #f0f2f5; display: flex; flex-direction: column; align-items: center; }
+    body { margin: 0; padding: 12px; background: #f0f2f5; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
     
-    header { width: 100%; max-width: 420px; text-align: center; margin-bottom: 15px; }
-    .store-badge { display: inline-block; background: #0056b3; color: #fff; padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; font-weight: bold; }
+    header { width: 100%; max-width: 420px; display: flex; flex-direction: column; align-items: center; gap: 8px; margin-bottom: 12px; }
+    .logo-header { height: 42px; object-fit: contain; }
+    .store-badge { display: inline-block; background: #d31319; color: #fff; padding: 5px 14px; border-radius: 18px; font-size: 0.85rem; font-weight: bold; letter-spacing: 0.3px; }
     
     #reader-container { width: 100%; max-width: 420px; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.08); padding: 10px; }
-    #reader { width: 100%; border-radius: 8px; overflow: hidden; }
+    #reader { width: 100%; border-radius: 8px; overflow: hidden; background: #000; min-height: 250px; }
 
     /* Modal / Pantalla de Resultados */
-    #result-view { display: none; width: 100%; max-width: 420px; margin-top: 15px; }
+    #result-view { display: none; width: 100%; max-width: 420px; margin-top: 12px; }
     .card { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 6px 16px rgba(0,0,0,0.1); text-align: center; }
     
     /* Fase 1: Imagen del producto (3s) */
     .product-img { max-width: 220px; max-height: 220px; object-fit: contain; margin: 0 auto; display: block; }
     .timer-bar { height: 4px; background: #e0e0e0; border-radius: 2px; margin-top: 15px; overflow: hidden; }
-    .timer-fill { height: 100%; background: #0056b3; width: 100%; animation: countdown 3s linear forwards; }
+    .timer-fill { height: 100%; background: #d31319; width: 100%; animation: countdown 3s linear forwards; }
     @keyframes countdown { from { width: 100%; } to { width: 0%; } }
 
     /* Fase 2: Etiqueta de Precios Oficial */
@@ -32,12 +33,20 @@
     .label-price { font-size: 2.8rem; font-weight: 900; margin: 10px 0; letter-spacing: -1px; }
     .label-tax { font-size: 0.82rem; color: #444; font-weight: 600; text-transform: uppercase; }
     .label-sub { font-size: 0.82rem; color: #555; margin-top: 4px; }
-    .btn-reset { margin-top: 15px; width: 100%; background: #111; color: #fff; border: none; padding: 12px; border-radius: 8px; font-weight: bold; font-size: 1rem; cursor: pointer; }
+    .btn-reset { margin-top: 15px; width: 100%; background: #111; color: #fff; border: none; padding: 13px; border-radius: 8px; font-weight: bold; font-size: 1rem; cursor: pointer; }
+
+    /* Banner Promocional Inferior */
+    .promo-section { width: 100%; max-width: 420px; margin-top: 14px; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
+    .promo-banner { width: 100%; height: auto; display: block; }
+    .promo-footer { padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; background: #fff; }
+    .promo-text { font-size: 0.82rem; font-weight: 600; color: #333; margin: 0; }
+    .promo-link { background: #d31319; color: #fff; text-decoration: none; font-size: 0.75rem; font-weight: bold; padding: 6px 12px; border-radius: 6px; }
   </style>
 </head>
 <body>
 
   <header>
+    <img class="logo-header" src="Logo de Coto.png" alt="COTO">
     <div id="sucursal-tag" class="store-badge">Cargando sucursal...</div>
   </header>
 
@@ -72,13 +81,22 @@
     </div>
   </div>
 
+  <!-- Sección de Promociones -->
+  <section class="promo-section">
+    <img class="promo-banner" src="Coto 100 por ciento.jpg" alt="Coto Digital">
+    <div class="promo-footer">
+      <p class="promo-text">Conocé los descuentos del día</p>
+      <a class="promo-link" href="https://www.coto.com.ar/descuentos" target="_blank" rel="noopener">Ver Ofertas</a>
+    </div>
+  </section>
+
   <script>
     // 1. Detección de Sucursal vía URL (?sucursal=...)
     const params = new URLSearchParams(window.location.search);
     const sucursal = params.get('sucursal') || "Coto, suc Palermo";
     document.getElementById('sucursal-tag').innerText = "📍 " + sucursal;
 
-    // 2. Base de Datos de Prueba (Datos extraídos de las fotos)
+    // 2. Base de Datos de Productos
     const DB_PRODUCTOS = {
       "7798061192071": {
         nombre: "Aceite de oliva OLIOVITA genovesa 500gr BOT-500-ml",
@@ -108,7 +126,6 @@
         detalleUnidad: "PRECIO X KG: $21290",
         imagen: "77900661_Celusal 100gr.png"
       },
-      // 1. Porotos de Soja Cuisine & Co
       "7792052065559": {
         nombre: "POROTOS DE SOJA CUISINE & CO 300GR LAT 205 GR.",
         precioFinal: "$ 1.150",
@@ -116,8 +133,6 @@
         detalleUnidad: "PRECIO X KILOGRAMO: $ 5.609,76",
         imagen: "7792052065559_Porotos de soja Cuisine Co.png"
       },
-
-      // 2. Arroz Molinos Ala Carnaroli
       "7791120099755": {
         nombre: "Arroz Molinos Ala Carnaroli Est 500gr EST-500-gr.",
         precioFinal: "$ 3.400",
@@ -125,8 +140,6 @@
         detalleUnidad: "PRECIO X KG: $ 6.800,00",
         imagen: "7791120099755_Arroz ala Carnaroli 500gr.png"
       },
-
-      // 3. Leche UAT 1% La Serenísima
       "7790742363107": {
         nombre: "LECHE UAT 1% LS BRIK 1 L ENVASE EDGE BRK 1000 ML",
         precioFinal: "$ 2.915",
@@ -134,8 +147,6 @@
         detalleUnidad: "PRECIO X LITRO: $ 2.915,00",
         imagen: "7790742363107_Leche LS larga vida 1 pciento.png"
       },
-
-      // 5. Café Nescafé Molido Puro
       "8445291583719": {
         nombre: "Cafe NESCAFE Molido Puro 190g BSA-190-gr.",
         precioFinal: "$ 13.350",
@@ -143,8 +154,6 @@
         detalleUnidad: "PRECIO X KG: $ 70.263,16",
         imagen: "8445291583719_Nescafe%20Molido%20Puro.png"
       },
-
-      // 6. Limpiador Líquido Desinfectante Lysoform
       "7790520989949": {
         nombre: "Limp Liq Desinf LYSOFORM Lav Bot 800ml BOT-1-un. 800 ml",
         precioFinal: "$ 4.900",
@@ -152,8 +161,6 @@
         detalleUnidad: "PRECIO X UN: $ 4.900,00",
         imagen: "7790520989949_Limpiador desinfectante lysoform.png"
       },
-
-      // 7. Cera Líquida Suiza (etiqueta a la izquierda de Lysoform)
       "7790613001091": {
         nombre: "cera L Líquida para madera SUIZA BOT-425-ml. Roble oscuro Tradicional",
         precioFinal: "$ 6.800",
@@ -161,8 +168,6 @@
         detalleUnidad: "PRECIO X LT: $ 16.000,00",
         imagen: "7790613001091_Cera liquida suiza roble oscuro.png"
       },
-
-      // 8. Agua Benedictino con Gas
       "7790895648861": {
         nombre: "AGUA BENEDICTINO CON GAS 1.5LT PET 1500 ML.",
         precioFinal: "$ 2.550",
@@ -170,8 +175,6 @@
         detalleUnidad: "PRECIO X LITRO: $ 1.700,00",
         imagen: "7790895648861_Agua Benedictino con gas.png"
       },
-
-      // 9. Jugo Listo Tutti Durazno
       "7798290580151": {
         nombre: "JUGO LISTO TUTTI DURAZNO 1LT BRK 1000 ML. DURAZNO",
         precioFinal: "$ 2.100",
@@ -179,8 +182,6 @@
         detalleUnidad: "PRECIO X LT: $ 2.100,00",
         imagen: "7798290580151_Jugo Tuti Durazno.png"
       },
-
-      // 10. Jugo Del Valle Manzana
       "7790154008290": {
         nombre: "Jugo DEL VALLE Manzana 1lt BRK-1000-ml.",
         precioFinal: "$ 2.300",
@@ -190,41 +191,46 @@
       }
     };
 
-let html5QrCode;
+    let html5QrCode;
     let timerTransition;
-    let isProcessing = false; // Bandera para evitar lecturas duplicadas
+
+    function iniciarCamara() {
+      html5QrCode = new Html5Qrcode("reader");
+      html5QrCode.start(
+        { facingMode: "environment" },
+        { fps: 15, qrbox: { width: 280, height: 180 } },
+        onScanSuccess
+      ).catch(err => console.error("Error al iniciar cámara:", err));
+    }
 
     function onScanSuccess(decodedText) {
-      // Si ya está mostrando un producto, ignorar nuevas lecturas
-      if (isProcessing) return;
-
       if (DB_PRODUCTOS[decodedText]) {
-        isProcessing = true; // Bloqueamos el escáner
-        mostrarProducto(DB_PRODUCTOS[decodedText], decodedText);
+        // Liberar hardware de cámara al leer exitosamente
+        html5QrCode.stop().then(() => {
+          mostrarProducto(DB_PRODUCTOS[decodedText], decodedText);
+        }).catch(err => {
+          mostrarProducto(DB_PRODUCTOS[decodedText], decodedText);
+        });
       } else {
         alert("Código no registrado: " + decodedText);
       }
     }
 
     function mostrarProducto(prod, codigo) {
-      // Ocultar el recuadro de la cámara y mostrar el resultado
       document.getElementById('reader-container').style.display = 'none';
       document.getElementById('result-view').style.display = 'block';
       document.getElementById('step-image').style.display = 'block';
       document.getElementById('step-label').style.display = 'none';
 
-      // Cargar datos Paso 1 (Foto)
       document.getElementById('step1-name').innerText = prod.nombre;
       document.getElementById('product-photo').src = prod.imagen;
 
-      // Cargar datos Paso 2 (Etiqueta Oficial)
       document.getElementById('lbl-title').innerText = prod.nombre;
       document.getElementById('lbl-price').innerText = prod.precioFinal;
       document.getElementById('lbl-tax').innerText = prod.sinImpuestos;
       document.getElementById('lbl-sub').innerText = prod.detalleUnidad;
       document.getElementById('lbl-code').innerText = "EAN: " + codigo;
 
-      // Temporizador de 3 segundos
       timerTransition = setTimeout(() => {
         document.getElementById('step-image').style.display = 'none';
         document.getElementById('step-label').style.display = 'block';
@@ -233,25 +239,12 @@ let html5QrCode;
 
     function reiniciarEscaneo() {
       clearTimeout(timerTransition);
-      // Ocultamos la ficha del producto y volvemos a mostrar el visor
       document.getElementById('result-view').style.display = 'none';
       document.getElementById('reader-container').style.display = 'block';
-      
-      // Reactivamos la posibilidad de escanear tras medio segundo
-      setTimeout(() => {
-        isProcessing = false;
-      }, 500);
+      iniciarCamara();
     }
 
-    // Inicializar Cámara al cargar
-    window.addEventListener('DOMContentLoaded', () => {
-      html5QrCode = new Html5Qrcode("reader");
-      html5QrCode.start(
-        { facingMode: "environment" }, // Cámara trasera
-        { fps: 15, qrbox: { width: 280, height: 180 } },
-        onScanSuccess
-      ).catch(err => console.error("Error al abrir cámara:", err));
-    });
+    window.addEventListener('DOMContentLoaded', iniciarCamara);
   </script>
 </body>
 </html>
