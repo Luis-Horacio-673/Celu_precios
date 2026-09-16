@@ -3,44 +3,59 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Verificador de Precios</title>
-  <!-- Librería ligera para leer códigos de barra -->
+  <title>Verificador y Carrito</title>
   <script src="https://unpkg.com/html5-qrcode"></script>
   <style>
     * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { margin: 0; padding: 12px; background: #f0f2f5; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+    body { margin: 0; padding: 12px; padding-bottom: 90px; background: #f0f2f5; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
     
     header { width: 100%; max-width: 420px; display: flex; flex-direction: column; align-items: center; gap: 8px; margin-bottom: 12px; }
-    .logo-header { height: 42px; object-fit: contain; }
-    .store-badge { display: inline-block; background: #d31319; color: #fff; padding: 5px 14px; border-radius: 18px; font-size: 0.85rem; font-weight: bold; letter-spacing: 0.3px; }
+    .logo-header { height: 40px; object-fit: contain; }
+    .store-badge { background: #d31319; color: #fff; padding: 4px 14px; border-radius: 18px; font-size: 0.8rem; font-weight: bold; }
     
     #reader-container { width: 100%; max-width: 420px; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.08); padding: 10px; }
-    #reader { width: 100%; border-radius: 8px; overflow: hidden; background: #000; min-height: 250px; }
+    #reader { width: 100%; border-radius: 8px; overflow: hidden; background: #000; min-height: 240px; }
 
-    /* Modal / Pantalla de Resultados */
-    #result-view { display: none; width: 100%; max-width: 420px; margin-top: 12px; }
-    .card { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 6px 16px rgba(0,0,0,0.1); text-align: center; }
+    #result-view { display: none; width: 100%; max-width: 420px; margin-top: 10px; }
+    .card { background: #fff; border-radius: 12px; padding: 18px; box-shadow: 0 6px 16px rgba(0,0,0,0.1); text-align: center; }
     
-    /* Fase 1: Imagen del producto (3s) */
-    .product-img { max-width: 220px; max-height: 220px; object-fit: contain; margin: 0 auto; display: block; }
+    .product-img { max-width: 200px; max-height: 200px; object-fit: contain; margin: 0 auto; display: block; }
     .timer-bar { height: 4px; background: #e0e0e0; border-radius: 2px; margin-top: 15px; overflow: hidden; }
     .timer-fill { height: 100%; background: #d31319; width: 100%; animation: countdown 3s linear forwards; }
     @keyframes countdown { from { width: 100%; } to { width: 0%; } }
 
-    /* Fase 2: Etiqueta de Precios Oficial */
     .label-box { border: 2px solid #222; border-radius: 6px; padding: 12px; text-align: left; background: #fff; }
-    .label-title { font-weight: 700; font-size: 1.05rem; margin-bottom: 8px; text-transform: uppercase; }
-    .label-price { font-size: 2.8rem; font-weight: 900; margin: 10px 0; letter-spacing: -1px; }
-    .label-tax { font-size: 0.82rem; color: #444; font-weight: 600; text-transform: uppercase; }
-    .label-sub { font-size: 0.82rem; color: #555; margin-top: 4px; }
-    .btn-reset { margin-top: 15px; width: 100%; background: #111; color: #fff; border: none; padding: 13px; border-radius: 8px; font-weight: bold; font-size: 1rem; cursor: pointer; }
+    .label-title { font-weight: 700; font-size: 0.95rem; margin-bottom: 6px; text-transform: uppercase; }
+    .label-price { font-size: 2.5rem; font-weight: 900; margin: 6px 0; letter-spacing: -1px; }
+    .label-tax, .label-sub { font-size: 0.78rem; color: #444; }
 
-    /* Banner Promocional Inferior */
+    /* Control de Unidades */
+    .qty-container { display: flex; align-items: center; justify-content: center; gap: 15px; margin: 15px 0 10px 0; }
+    .btn-qty { width: 38px; height: 38px; border-radius: 50%; border: 1px solid #ccc; background: #fff; font-size: 1.3rem; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .qty-number { font-size: 1.3rem; font-weight: bold; width: 30px; }
+
+    .action-buttons { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+    .btn-add { background: #008744; color: #fff; border: none; padding: 12px; border-radius: 8px; font-weight: bold; font-size: 1rem; cursor: pointer; }
+    .btn-cancel { background: #666; color: #fff; border: none; padding: 10px; border-radius: 8px; font-weight: bold; font-size: 0.85rem; cursor: pointer; }
+
+    /* Barra Flotante de Compra */
+    #cart-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #111; color: #fff; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 -3px 12px rgba(0,0,0,0.2); z-index: 100; cursor: pointer; }
+    .cart-summary { display: flex; flex-direction: column; }
+    .cart-total { font-size: 1.3rem; font-weight: 900; color: #00ff73; }
+    .cart-items-count { font-size: 0.75rem; color: #bbb; }
+
+    /* Modal / Lista de Compra */
+    #cart-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 200; justify-content: center; align-items: flex-end; }
+    .cart-content { background: #fff; width: 100%; max-width: 480px; max-height: 75vh; border-radius: 16px 16px 0 0; padding: 18px; display: flex; flex-direction: column; }
+    .cart-list { overflow-y: auto; flex-grow: 1; margin: 10px 0; padding: 0; list-style: none; }
+    .cart-item { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding: 8px 0; font-size: 0.85rem; }
+    .btn-remove { color: #d31319; border: none; background: transparent; font-weight: bold; font-size: 1rem; padding: 4px 8px; cursor: pointer; }
+    .btn-close-cart { background: #111; color: #fff; border: none; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 8px; }
+
+    /* Promociones */
     .promo-section { width: 100%; max-width: 420px; margin-top: 14px; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
     .promo-banner { width: 100%; height: auto; display: block; }
-    .promo-footer { padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; background: #fff; }
-    .promo-text { font-size: 0.82rem; font-weight: 600; color: #333; margin: 0; }
-    .promo-link { background: #d31319; color: #fff; text-decoration: none; font-size: 0.75rem; font-weight: bold; padding: 6px 12px; border-radius: 6px; }
+    .promo-footer { padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; }
   </style>
 </head>
 <body>
@@ -50,149 +65,107 @@
     <div id="sucursal-tag" class="store-badge">Cargando sucursal...</div>
   </header>
 
-  <!-- Lector de Cámara -->
   <div id="reader-container">
     <div id="reader"></div>
-    <p style="text-align:center; font-size: 0.8rem; color: #666; margin: 8px 0 0 0;">Apunta al código de barras del producto</p>
+    <p style="text-align:center; font-size: 0.8rem; color: #666; margin: 8px 0 0 0;">Apunta al código de barras</p>
   </div>
 
-  <!-- Vista de Producto -->
   <div id="result-view">
-    <!-- Paso 1: Foto 3s -->
+    <!-- Fase 1: Foto 3s -->
     <div id="step-image" class="card">
-      <h3 id="step1-name" style="margin-top:0;"></h3>
+      <h3 id="step1-name" style="margin-top:0; font-size:1rem;"></h3>
       <img id="product-photo" class="product-img" src="" alt="Producto">
       <div class="timer-bar"><div class="timer-fill"></div></div>
       <p style="font-size:0.75rem; color:#888; margin-top:8px;">Mostrando precio en 3 segundos...</p>
     </div>
 
-    <!-- Paso 2: Etiqueta Oficial de Precio -->
+    <!-- Fase 2: Etiqueta Oficial + Selector de Cantidad -->
     <div id="step-label" class="card" style="display: none;">
       <div class="label-box">
         <div id="lbl-title" class="label-title"></div>
         <div id="lbl-price" class="label-price"></div>
         <div id="lbl-tax" class="label-tax"></div>
         <div id="lbl-sub" class="label-sub"></div>
-        <div style="font-size:0.75rem; color:#777; margin-top: 8px; border-top: 1px dashed #ccc; padding-top: 4px;">
-          ORIGEN: Argentina | <span id="lbl-code"></span>
-        </div>
       </div>
-      <button class="btn-reset" onclick="reiniciarEscaneo()">Escanear otro producto</button>
+
+      <!-- Selector de Unidades -->
+      <div class="qty-container">
+        <button class="btn-qty" onclick="ajustarCantidad(-1)">-</button>
+        <span id="qty-value" class="qty-number">1</span>
+        <button class="btn-qty" onclick="ajustarCantidad(1)">+</button>
+      </div>
+      <div style="font-size:0.85rem; font-weight: bold; color: #333; margin-bottom: 8px;">
+        Subtotal: <span id="lbl-subtotal">$ 0</span>
+      </div>
+
+      <div class="action-buttons">
+        <button class="btn-add" onclick="agregarAlCarrito()">🛒 Agregar al changuito</button>
+        <button class="btn-cancel" onclick="reiniciarEscaneo()">Solo consultar (no sumar)</button>
+      </div>
     </div>
   </div>
 
-  <!-- Sección de Promociones -->
   <section class="promo-section">
-    <img class="promo-banner" src="Coto 100 por ciento.jpg" alt="Coto Digital">
+    <img class="promo-banner" src="Coto 100 por ciento.jpg" alt="Coto">
     <div class="promo-footer">
-      <p class="promo-text">Conocé los descuentos del día</p>
-      <a class="promo-link" href="https://www.coto.com.ar/descuentos" target="_blank" rel="noopener">Ver Ofertas</a>
+      <span style="font-size:0.8rem; font-weight:600;">Descuentos del día</span>
+      <a href="https://www.coto.com.ar/descuentos" target="_blank" style="background:#d31319; color:#fff; padding:4px 10px; border-radius:6px; font-size:0.75rem; text-decoration:none; font-weight:bold;">Ver Ofertas</a>
     </div>
   </section>
 
-  <script>
-    // 1. Detección de Sucursal vía URL (?sucursal=...)
-    const params = new URLSearchParams(window.location.search);
-    const sucursal = params.get('sucursal') || "Coto, suc Palermo";
-    document.getElementById('sucursal-tag').innerText = "📍 " + sucursal;
+  <!-- Barra de Total Flotante -->
+  <div id="cart-bar" onclick="abrirCarrito()">
+    <div class="cart-summary">
+      <span id="cart-count-txt" class="cart-items-count">0 productos en total</span>
+      <span id="cart-total-txt" class="cart-total">$ 0</span>
+    </div>
+    <span style="font-size: 0.85rem; font-weight:bold; background: #333; padding: 6px 12px; border-radius: 8px;">Ver changuito ▲</span>
+  </div>
 
-    // 2. Base de Datos de Productos
+  <!-- Modal Detalle del Carrito -->
+  <div id="cart-modal">
+    <div class="cart-content">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h3 style="margin:0;">Mi changuito</h3>
+        <button onclick="vaciarCarrito()" style="background:none; border:none; color:#d31319; font-size:0.75rem; cursor:pointer;">Vaciar todo</button>
+      </div>
+      <ul id="cart-items-list" class="cart-list"></ul>
+      <div style="border-top:2px solid #333; padding-top:10px; display:flex; justify-content:space-between; font-weight:bold;">
+        <span>TOTAL COMPRA:</span>
+        <span id="modal-total" style="color:#008744; font-size:1.2rem;">$ 0</span>
+      </div>
+      <button class="btn-close-cart" onclick="cerrarCarrito()">Seguir comprando</button>
+    </div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    document.getElementById('sucursal-tag').innerText = "📍 " + (params.get('sucursal') || "Coto, suc Palermo");
+
+    // Base de datos con precios numéricos directos para facilitar la suma
     const DB_PRODUCTOS = {
-      "7798061192071": {
-        nombre: "Aceite de oliva OLIOVITA genovesa 500gr BOT-500-ml",
-        precioFinal: "$ 20.250",
-        sinImpuestos: "PRECIO SIN IMPUESTOS NACIONALES: $16.735,54",
-        detalleUnidad: "PRECIO X LT: $40.500",
-        imagen: "7790503199112_Aceite Oleovita.png"
-      },
-      "7792335000321": {
-        nombre: "HUEVO AVICOPER BLANCO CJA 6 UN. CARTON",
-        precioFinal: "$ 2.450",
-        sinImpuestos: "PRECIO SIN IMPUESTOS NACIONALES: $ 2.024,79",
-        detalleUnidad: "PRECIO X UNIDAD: $408,33",
-        imagen: "7792335000321_Huevos Avicoper 6un.png"
-      },
-      "7790503199112": {
-        nombre: "Arroz doble DOS HERMANOS 1kg BSA-1000-gr",
-        precioFinal: "$ 3.650",
-        sinImpuestos: "PRECIO SIN IMPUESTOS NACIONALES: $3.016,53",
-        detalleUnidad: "PRECIO X KG: $3.650",
-        imagen: "7790503199112_Arroz dos Hermanos.png"
-      },
-      "77900661": {
-        nombre: "Sal fina CELUSAL 100-gr",
-        precioFinal: "$ 2.129",
-        sinImpuestos: "PRECIO SIN IMPUESTOS NACIONALES: $1.759,50",
-        detalleUnidad: "PRECIO X KG: $21290",
-        imagen: "77900661_Celusal 100gr.png"
-      },
-      "7792052065559": {
-        nombre: "POROTOS DE SOJA CUISINE & CO 300GR LAT 205 GR.",
-        precioFinal: "$ 1.150",
-        sinImpuestos: "PRECIO SIN IMPUESTOS NACIONALES: $ 950,41",
-        detalleUnidad: "PRECIO X KILOGRAMO: $ 5.609,76",
-        imagen: "7792052065559_Porotos de soja Cuisine Co.png"
-      },
-      "7791120099755": {
-        nombre: "Arroz Molinos Ala Carnaroli Est 500gr EST-500-gr.",
-        precioFinal: "$ 3.400",
-        sinImpuestos: "PRECIO SIN IMPUESTOS NACIONALES: $ 2.809,92",
-        detalleUnidad: "PRECIO X KG: $ 6.800,00",
-        imagen: "7791120099755_Arroz ala Carnaroli 500gr.png"
-      },
-      "7790742363107": {
-        nombre: "LECHE UAT 1% LS BRIK 1 L ENVASE EDGE BRK 1000 ML",
-        precioFinal: "$ 2.915",
-        sinImpuestos: "PRECIO SIN IMPUESTOS NACIONALES: $ 2.915,00",
-        detalleUnidad: "PRECIO X LITRO: $ 2.915,00",
-        imagen: "7790742363107_Leche LS larga vida 1 pciento.png"
-      },
-      "8445291583719": {
-        nombre: "Cafe NESCAFE Molido Puro 190g BSA-190-gr.",
-        precioFinal: "$ 13.350",
-        sinImpuestos: "PRECIO SIN IMPUESTOS NACIONALES: $ 11.033,06",
-        detalleUnidad: "PRECIO X KG: $ 70.263,16",
-        imagen: "8445291583719_Nescafe%20Molido%20Puro.png"
-      },
-      "7790520989949": {
-        nombre: "Limp Liq Desinf LYSOFORM Lav Bot 800ml BOT-1-un. 800 ml",
-        precioFinal: "$ 4.900",
-        sinImpuestos: "PRECIO SIN IMPUESTOS NACIONALES: $ 4.049,59",
-        detalleUnidad: "PRECIO X UN: $ 4.900,00",
-        imagen: "7790520989949_Limpiador desinfectante lysoform.png"
-      },
-      "7790613001091": {
-        nombre: "cera L Líquida para madera SUIZA BOT-425-ml. Roble oscuro Tradicional",
-        precioFinal: "$ 6.800",
-        sinImpuestos: "PRECIO SIN IMPUESTOS NACIONALES: $ 5.619,83",
-        detalleUnidad: "PRECIO X LT: $ 16.000,00",
-        imagen: "7790613001091_Cera liquida suiza roble oscuro.png"
-      },
-      "7790895648861": {
-        nombre: "AGUA BENEDICTINO CON GAS 1.5LT PET 1500 ML.",
-        precioFinal: "$ 2.550",
-        sinImpuestos: "PRECIO SIN IMPUESTOS NACIONALES: $ 2.107,44",
-        detalleUnidad: "PRECIO X LITRO: $ 1.700,00",
-        imagen: "7790895648861_Agua Benedictino con gas.png"
-      },
-      "7798290580151": {
-        nombre: "JUGO LISTO TUTTI DURAZNO 1LT BRK 1000 ML. DURAZNO",
-        precioFinal: "$ 2.100",
-        sinImpuestos: "PRECIO SIN IMPUESTOS NACIONALES: $ 1.735,54",
-        detalleUnidad: "PRECIO X LT: $ 2.100,00",
-        imagen: "7798290580151_Jugo Tuti Durazno.png"
-      },
-      "7790154008290": {
-        nombre: "Jugo DEL VALLE Manzana 1lt BRK-1000-ml.",
-        precioFinal: "$ 2.300",
-        sinImpuestos: "PRECIO SIN IMPUESTOS NACIONALES: $ 1.900,83",
-        detalleUnidad: "PRECIO X LT: $ 2.300,00",
-        imagen: "7790154008290_Jugo Del Valle Manzana.png"
-      }
+      "7798061192071": { nombre: "Aceite de oliva OLIOVITA genovesa 500gr BOT-500-ml", precio: 20250, sinImpuestos: "PRECIO SIN IMPUESTOS NACIONALES: $16.735,54", detalleUnidad: "PRECIO X LT: $40.500", imagen: "7790503199112_Aceite Oleovita.png" },
+      "7792335000321": { nombre: "HUEVO AVICOPER BLANCO CJA 6 UN. CARTON", precio: 2450, sinImpuestos: "PRECIO SIN IMPUESTOS NACIONALES: $ 2.024,79", detalleUnidad: "PRECIO X UNIDAD: $408,33", imagen: "7792335000321_Huevos Avicoper 6un.png" },
+      "7790503199112": { nombre: "Arroz doble DOS HERMANOS 1kg BSA-1000-gr", precio: 3650, sinImpuestos: "PRECIO SIN IMPUESTOS NACIONALES: $3.016,53", detalleUnidad: "PRECIO X KG: $3.650", imagen: "7790503199112_Arroz dos Hermanos.png" },
+      "77900661": { nombre: "Sal fina CELUSAL 100-gr", precio: 2129, sinImpuestos: "PRECIO SIN IMPUESTOS NACIONALES: $1.759,50", detalleUnidad: "PRECIO X KG: $21290", imagen: "77900661_Celusal 100gr.png" },
+      "7792052065559": { nombre: "POROTOS DE SOJA CUISINE & CO 300GR LAT 205 GR.", precio: 1150, sinImpuestos: "PRECIO SIN IMPUESTOS NACIONALES: $ 950,41", detalleUnidad: "PRECIO X KILOGRAMO: $ 5.609,76", imagen: "7792052065559_Porotos de soja Cuisine Co.png" },
+      "7791120099755": { nombre: "Arroz Molinos Ala Carnaroli Est 500gr EST-500-gr.", precio: 3400, sinImpuestos: "PRECIO SIN IMPUESTOS NACIONALES: $ 2.809,92", detalleUnidad: "PRECIO X KG: $ 6.800,00", imagen: "7791120099755_Arroz ala Carnaroli 500gr.png" },
+      "7790742363107": { nombre: "LECHE UAT 1% LS BRIK 1 L ENVASE EDGE BRK 1000 ML", precio: 2915, sinImpuestos: "PRECIO SIN IMPUESTOS NACIONALES: $ 2.915,00", detalleUnidad: "PRECIO X LITRO: $ 2.915,00", imagen: "7790742363107_Leche LS larga vida 1 pciento.png" },
+      "8445291583719": { nombre: "Cafe NESCAFE Molido Puro 190g BSA-190-gr.", precio: 13350, sinImpuestos: "PRECIO SIN IMPUESTOS NACIONALES: $ 11.033,06", detalleUnidad: "PRECIO X KG: $ 70.263,16", imagen: "8445291583719_Nescafe%20Molido%20Puro.png" },
+      "7790520989949": { nombre: "Limp Liq Desinf LYSOFORM Lav Bot 800ml BOT-1-un. 800 ml", precio: 4900, sinImpuestos: "PRECIO SIN IMPUESTOS NACIONALES: $ 4.049,59", detalleUnidad: "PRECIO X UN: $ 4.900,00", imagen: "7790520989949_Limpiador desinfectante lysoform.png" },
+      "7790613001091": { nombre: "cera L Líquida para madera SUIZA BOT-425-ml.", precio: 6800, sinImpuestos: "PRECIO SIN IMPUESTOS NACIONALES: $ 5.619,83", detalleUnidad: "PRECIO X LT: $ 16.000,00", imagen: "7790613001091_Cera liquida suiza roble oscuro.png" },
+      "7790895648861": { nombre: "AGUA BENEDICTINO CON GAS 1.5LT PET 1500 ML.", precio: 2550, sinImpuestos: "PRECIO SIN IMPUESTOS NACIONALES: $ 2.107,44", detalleUnidad: "PRECIO X LITRO: $ 1.700,00", imagen: "7790895648861_Agua Benedictino con gas.png" },
+      "7798290580151": { nombre: "JUGO LISTO TUTTI DURAZNO 1LT BRK 1000 ML.", precio: 2100, sinImpuestos: "PRECIO SIN IMPUESTOS NACIONALES: $ 1.735,54", detalleUnidad: "PRECIO X LT: $ 2.100,00", imagen: "7798290580151_Jugo Tuti Durazno.png" },
+      "7790154008290": { nombre: "Jugo DEL VALLE Manzana 1lt BRK-1000-ml.", precio: 2300, sinImpuestos: "PRECIO SIN IMPUESTOS NACIONALES: $ 1.900,83", detalleUnidad: "PRECIO X LT: $ 2.300,00", imagen: "7790154008290_Jugo Del Valle Manzana.png" }
     };
 
     let html5QrCode;
     let timerTransition;
+    let productoActual = null;
+    let cantidadSeleccionada = 1;
+    let carrito = [];
+
+    const formatearMoneda = (val) => "$ " + val.toLocaleString("es-AR");
 
     function iniciarCamara() {
       html5QrCode = new Html5Qrcode("reader");
@@ -200,23 +173,25 @@
         { facingMode: "environment" },
         { fps: 15, qrbox: { width: 280, height: 180 } },
         onScanSuccess
-      ).catch(err => console.error("Error al iniciar cámara:", err));
+      ).catch(err => console.error("Error cámara:", err));
     }
 
     function onScanSuccess(decodedText) {
       if (DB_PRODUCTOS[decodedText]) {
-        // Liberar hardware de cámara al leer exitosamente
+        productoActual = { ...DB_PRODUCTOS[decodedText], codigo: decodedText };
+        cantidadSeleccionada = 1;
+
         html5QrCode.stop().then(() => {
-          mostrarProducto(DB_PRODUCTOS[decodedText], decodedText);
-        }).catch(err => {
-          mostrarProducto(DB_PRODUCTOS[decodedText], decodedText);
+          mostrarProducto(productoActual);
+        }).catch(() => {
+          mostrarProducto(productoActual);
         });
       } else {
         alert("Código no registrado: " + decodedText);
       }
     }
 
-    function mostrarProducto(prod, codigo) {
+    function mostrarProducto(prod) {
       document.getElementById('reader-container').style.display = 'none';
       document.getElementById('result-view').style.display = 'block';
       document.getElementById('step-image').style.display = 'block';
@@ -226,15 +201,84 @@
       document.getElementById('product-photo').src = prod.imagen;
 
       document.getElementById('lbl-title').innerText = prod.nombre;
-      document.getElementById('lbl-price').innerText = prod.precioFinal;
+      document.getElementById('lbl-price').innerText = formatearMoneda(prod.precio);
       document.getElementById('lbl-tax').innerText = prod.sinImpuestos;
       document.getElementById('lbl-sub').innerText = prod.detalleUnidad;
-      document.getElementById('lbl-code').innerText = "EAN: " + codigo;
+
+      actualizarSubtotalUI();
 
       timerTransition = setTimeout(() => {
         document.getElementById('step-image').style.display = 'none';
         document.getElementById('step-label').style.display = 'block';
       }, 3000);
+    }
+
+    function ajustarCantidad(delta) {
+      if (cantidadSeleccionada + delta >= 1) {
+        cantidadSeleccionada += delta;
+        actualizarSubtotalUI();
+      }
+    }
+
+    function actualizarSubtotalUI() {
+      document.getElementById('qty-value').innerText = cantidadSeleccionada;
+      const subtotal = productoActual.precio * cantidadSeleccionada;
+      document.getElementById('lbl-subtotal').innerText = formatearMoneda(subtotal);
+    }
+
+    function agregarAlCarrito() {
+      carrito.push({
+        id: Date.now(),
+        nombre: productoActual.nombre,
+        precioUnitario: productoActual.precio,
+        cantidad: cantidadSeleccionada,
+        subtotal: productoActual.precio * cantidadSeleccionada
+      });
+      actualizarCarritoUI();
+      reiniciarEscaneo();
+    }
+
+    function actualizarCarritoUI() {
+      const totalItems = carrito.reduce((sum, item) => sum + item.cantidad, 0);
+      const totalMonto = carrito.reduce((sum, item) => sum + item.subtotal, 0);
+
+      document.getElementById('cart-count-txt').innerText = `${totalItems} productos en total`;
+      document.getElementById('cart-total-txt').innerText = formatearMoneda(totalMonto);
+      document.getElementById('modal-total').innerText = formatearMoneda(totalMonto);
+
+      const lista = document.getElementById('cart-items-list');
+      lista.innerHTML = "";
+      carrito.forEach(item => {
+        const li = document.createElement('li');
+        li.className = "cart-item";
+        li.innerHTML = `
+          <div>
+            <div><b>${item.cantidad}x</b> ${item.nombre}</div>
+            <small style="color:#666;">${formatearMoneda(item.precioUnitario)} c/u = <b>${formatearMoneda(item.subtotal)}</b></small>
+          </div>
+          <button class="btn-remove" onclick="eliminarDelCarrito(${item.id})">✕</button>
+        `;
+        lista.appendChild(li);
+      });
+    }
+
+    function eliminarDelCarrito(id) {
+      carrito = carrito.filter(it => it.id !== id);
+      actualizarCarritoUI();
+    }
+
+    function vaciarCarrito() {
+      carrito = [];
+      actualizarCarritoUI();
+      cerrarCarrito();
+    }
+
+    function abrirCarrito() {
+      document.getElementById('cart-modal').style.display = 'flex';
+    }
+
+    function cerrarCarrito() {
+      document.getElementById('cart-modal').style.display = 'none';
     }
 
     function reiniciarEscaneo() {
