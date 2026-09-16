@@ -197,6 +197,12 @@
       document.getElementById('step-image').style.display = 'block';
       document.getElementById('step-label').style.display = 'none';
 
+      // Restaurar el botón de agregar para el nuevo producto
+      const btnAdd = document.querySelector('.btn-add');
+      btnAdd.disabled = false;
+      btnAdd.innerText = "🛒 Agregar al changuito";
+      btnAdd.style.background = "#008744";
+
       document.getElementById('step1-name').innerText = prod.nombre;
       document.getElementById('product-photo').src = prod.imagen;
 
@@ -227,6 +233,10 @@
     }
 
     function agregarAlCarrito() {
+      // Evitar agregar si ya fue procesado
+      const btnAdd = document.querySelector('.btn-add');
+      if (btnAdd.disabled) return;
+
       carrito.push({
         id: Date.now(),
         nombre: productoActual.nombre,
@@ -235,7 +245,15 @@
         subtotal: productoActual.precio * cantidadSeleccionada
       });
       actualizarCarritoUI();
-      reiniciarEscaneo();
+      // Feedback visual inmediato y bloqueo del botón
+      btnAdd.disabled = true;
+      btnAdd.innerText = "✔ ¡Agregado al changuito!";
+      btnAdd.style.background = "#555";
+
+      // Vuelve automáticamente a la cámara tras 800ms
+      setTimeout(() => {
+        reiniciarEscaneo();
+      }, 800);
     }
 
     function actualizarCarritoUI() {
@@ -273,8 +291,12 @@
       cerrarCarrito();
     }
 
-    function abrirCarrito() {
-      document.getElementById('cart-modal').style.display = 'flex';
+    function cerrarCarrito() {
+      document.getElementById('cart-modal').style.display = 'none';
+      // Si la ficha del producto seguía abierta de fondo, volver directamente a la cámara
+      if (document.getElementById('result-view').style.display === 'block') {
+        reiniciarEscaneo();
+      }
     }
 
     function cerrarCarrito() {
