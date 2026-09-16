@@ -141,6 +141,7 @@
   </div>
 
   <script>
+
     const params = new URLSearchParams(window.location.search);
     document.getElementById('sucursal-tag').innerText = "📍 " + (params.get('sucursal') || "Coto, suc Palermo");
 
@@ -171,9 +172,14 @@
 
     function iniciarCamara() {
       if (camaraActiva) return;
+      
+      const container = document.getElementById('reader-container');
+      if (container.style.display === 'none') return;
+
       if (!html5QrCode) {
         html5QrCode = new Html5Qrcode("reader");
       }
+
       html5QrCode.start(
         { facingMode: "environment" },
         { fps: 15, qrbox: { width: 280, height: 180 } },
@@ -181,7 +187,7 @@
       ).then(() => {
         camaraActiva = true;
       }).catch(err => {
-        console.error("Error al iniciar cámara:", err);
+        console.warn("Fallo al iniciar cámara:", err);
         camaraActiva = false;
       });
     }
@@ -190,26 +196,29 @@
       if (html5QrCode && camaraActiva) {
         html5QrCode.stop().then(() => {
           camaraActiva = false;
-          callback();
+          if (callback) callback();
         }).catch(() => {
           camaraActiva = false;
-          callback();
+          if (callback) callback();
         });
       } else {
-        callback();
+        if (callback) callback();
       }
     }
 
     function onScanSuccess(decodedText) {
-      if (DB_PRODUCTOS[decodedText]) {
-        productoActual = { ...DB_PRODUCTOS[decodedText], codigo: decodedText };
+      // Limpieza de caracteres invisibles o errores de lectura
+      const codigoLimpio = String(decodedText).trim();
+
+      if (DB_PRODUCTOS[codigoLimpio]) {
+        productoActual = { ...DB_PRODUCTOS[codigoLimpio], codigo: codigoLimpio };
         cantidadSeleccionada = 1;
 
         detenerCamaraYEjecutar(() => {
           mostrarProducto(productoActual);
         });
       } else {
-        alert("Código no registrado: " + decodedText);
+        alert("Código no registrado: " + codigoLimpio);
       }
     }
 
@@ -219,7 +228,6 @@
       document.getElementById('step-image').style.display = 'block';
       document.getElementById('step-label').style.display = 'none';
 
-      // Restaurar estado inicial del botón de agregar
       const btnAdd = document.getElementById('btn-add-main');
       btnAdd.disabled = false;
       btnAdd.innerText = "🛒 Agregar al changuito";
@@ -267,12 +275,10 @@
       });
       actualizarCarritoUI();
 
-      // Bloquear botón para que no se presione dos veces
       btnAdd.disabled = true;
       btnAdd.innerText = "✔ ¡Agregado!";
       btnAdd.style.background = "#555";
 
-      // Vuelve a la cámara en 600ms
       setTimeout(() => {
         reiniciarEscaneo();
       }, 600);
@@ -319,7 +325,6 @@
 
     function cerrarCarrito() {
       document.getElementById('cart-modal').style.display = 'none';
-      // Forzar siempre la salida hacia la cámara activa
       reiniciarEscaneo();
     }
 
@@ -330,7 +335,21 @@
       iniciarCamara();
     }
 
+    // GESTIÓN DE SEGUNDO PLANO / MULTITAREA
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) {
+        // Al salir de la app, apagar la cámara
+        detenerCamaraYEjecutar();
+      } else {
+        // Al regresar al navegador, reconectar la cámara en frío si estamos en el visor
+        if (document.getElementById('reader-container').style.display !== 'none') {
+          setTimeout(iniciarCamara, 300);
+        }
+      }
+    });
+
     window.addEventListener('DOMContentLoaded', iniciarCamara);
+    
   </script>
 </body>
 </html>
