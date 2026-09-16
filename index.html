@@ -7,7 +7,7 @@
   <script src="https://unpkg.com/html5-qrcode"></script>
   <style>
     * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { margin: 0; padding: 12px; padding-bottom: 90px; background: #f0f2f5; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+    body { margin: 0; padding: 12px; padding-bottom: 95px; background: #f0f2f5; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
     
     header { width: 100%; max-width: 420px; display: flex; flex-direction: column; align-items: center; gap: 8px; margin-bottom: 12px; }
     .logo-header { height: 40px; object-fit: contain; }
@@ -29,13 +29,13 @@
     .label-price { font-size: 2.5rem; font-weight: 900; margin: 6px 0; letter-spacing: -1px; }
     .label-tax, .label-sub { font-size: 0.78rem; color: #444; }
 
-    /* Control de Unidades */
+    /* Selector de Unidades */
     .qty-container { display: flex; align-items: center; justify-content: center; gap: 15px; margin: 15px 0 10px 0; }
     .btn-qty { width: 38px; height: 38px; border-radius: 50%; border: 1px solid #ccc; background: #fff; font-size: 1.3rem; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; }
     .qty-number { font-size: 1.3rem; font-weight: bold; width: 30px; }
 
     .action-buttons { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
-    .btn-add { background: #008744; color: #fff; border: none; padding: 12px; border-radius: 8px; font-weight: bold; font-size: 1rem; cursor: pointer; }
+    .btn-add { background: #008744; color: #fff; border: none; padding: 12px; border-radius: 8px; font-weight: bold; font-size: 1rem; cursor: pointer; transition: background 0.2s; }
     .btn-cancel { background: #666; color: #fff; border: none; padding: 10px; border-radius: 8px; font-weight: bold; font-size: 0.85rem; cursor: pointer; }
 
     /* Barra Flotante de Compra */
@@ -44,12 +44,12 @@
     .cart-total { font-size: 1.3rem; font-weight: 900; color: #00ff73; }
     .cart-items-count { font-size: 0.75rem; color: #bbb; }
 
-    /* Modal / Lista de Compra */
+    /* Modal Changuito */
     #cart-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 200; justify-content: center; align-items: flex-end; }
     .cart-content { background: #fff; width: 100%; max-width: 480px; max-height: 75vh; border-radius: 16px 16px 0 0; padding: 18px; display: flex; flex-direction: column; }
     .cart-list { overflow-y: auto; flex-grow: 1; margin: 10px 0; padding: 0; list-style: none; }
     .cart-item { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding: 8px 0; font-size: 0.85rem; }
-    .btn-remove { color: #d31319; border: none; background: transparent; font-weight: bold; font-size: 1rem; padding: 4px 8px; cursor: pointer; }
+    .btn-remove { color: #d31319; border: none; background: transparent; font-weight: bold; font-size: 1.1rem; padding: 4px 8px; cursor: pointer; }
     .btn-close-cart { background: #111; color: #fff; border: none; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 8px; }
 
     /* Promociones */
@@ -65,11 +65,13 @@
     <div id="sucursal-tag" class="store-badge">Cargando sucursal...</div>
   </header>
 
+  <!-- Lector de Cámara -->
   <div id="reader-container">
     <div id="reader"></div>
     <p style="text-align:center; font-size: 0.8rem; color: #666; margin: 8px 0 0 0;">Apunta al código de barras</p>
   </div>
 
+  <!-- Vista de Producto -->
   <div id="result-view">
     <!-- Fase 1: Foto 3s -->
     <div id="step-image" class="card">
@@ -99,7 +101,7 @@
       </div>
 
       <div class="action-buttons">
-        <button class="btn-add" onclick="agregarAlCarrito()">🛒 Agregar al changuito</button>
+        <button id="btn-add-main" class="btn-add" onclick="agregarAlCarrito()">🛒 Agregar al changuito</button>
         <button class="btn-cancel" onclick="reiniciarEscaneo()">Solo consultar (no sumar)</button>
       </div>
     </div>
@@ -113,7 +115,7 @@
     </div>
   </section>
 
-  <!-- Barra de Total Flotante -->
+  <!-- Barra Flotante de Compra -->
   <div id="cart-bar" onclick="abrirCarrito()">
     <div class="cart-summary">
       <span id="cart-count-txt" class="cart-items-count">0 productos en total</span>
@@ -142,7 +144,6 @@
     const params = new URLSearchParams(window.location.search);
     document.getElementById('sucursal-tag').innerText = "📍 " + (params.get('sucursal') || "Coto, suc Palermo");
 
-    // Base de datos con precios numéricos directos para facilitar la suma
     const DB_PRODUCTOS = {
       "7798061192071": { nombre: "Aceite de oliva OLIOVITA genovesa 500gr BOT-500-ml", precio: 20250, sinImpuestos: "PRECIO SIN IMPUESTOS NACIONALES: $16.735,54", detalleUnidad: "PRECIO X LT: $40.500", imagen: "7790503199112_Aceite Oleovita.png" },
       "7792335000321": { nombre: "HUEVO AVICOPER BLANCO CJA 6 UN. CARTON", precio: 2450, sinImpuestos: "PRECIO SIN IMPUESTOS NACIONALES: $ 2.024,79", detalleUnidad: "PRECIO X UNIDAD: $408,33", imagen: "7792335000321_Huevos Avicoper 6un.png" },
@@ -159,21 +160,44 @@
       "7790154008290": { nombre: "Jugo DEL VALLE Manzana 1lt BRK-1000-ml.", precio: 2300, sinImpuestos: "PRECIO SIN IMPUESTOS NACIONALES: $ 1.900,83", detalleUnidad: "PRECIO X LT: $ 2.300,00", imagen: "7790154008290_Jugo Del Valle Manzana.png" }
     };
 
-    let html5QrCode;
-    let timerTransition;
+    let html5QrCode = null;
+    let timerTransition = null;
     let productoActual = null;
     let cantidadSeleccionada = 1;
     let carrito = [];
+    let camaraActiva = false;
 
     const formatearMoneda = (val) => "$ " + val.toLocaleString("es-AR");
 
     function iniciarCamara() {
-      html5QrCode = new Html5Qrcode("reader");
+      if (camaraActiva) return;
+      if (!html5QrCode) {
+        html5QrCode = new Html5Qrcode("reader");
+      }
       html5QrCode.start(
         { facingMode: "environment" },
         { fps: 15, qrbox: { width: 280, height: 180 } },
         onScanSuccess
-      ).catch(err => console.error("Error cámara:", err));
+      ).then(() => {
+        camaraActiva = true;
+      }).catch(err => {
+        console.error("Error al iniciar cámara:", err);
+        camaraActiva = false;
+      });
+    }
+
+    function detenerCamaraYEjecutar(callback) {
+      if (html5QrCode && camaraActiva) {
+        html5QrCode.stop().then(() => {
+          camaraActiva = false;
+          callback();
+        }).catch(() => {
+          camaraActiva = false;
+          callback();
+        });
+      } else {
+        callback();
+      }
     }
 
     function onScanSuccess(decodedText) {
@@ -181,9 +205,7 @@
         productoActual = { ...DB_PRODUCTOS[decodedText], codigo: decodedText };
         cantidadSeleccionada = 1;
 
-        html5QrCode.stop().then(() => {
-          mostrarProducto(productoActual);
-        }).catch(() => {
+        detenerCamaraYEjecutar(() => {
           mostrarProducto(productoActual);
         });
       } else {
@@ -197,8 +219,8 @@
       document.getElementById('step-image').style.display = 'block';
       document.getElementById('step-label').style.display = 'none';
 
-      // Restaurar el botón de agregar para el nuevo producto
-      const btnAdd = document.querySelector('.btn-add');
+      // Restaurar estado inicial del botón de agregar
+      const btnAdd = document.getElementById('btn-add-main');
       btnAdd.disabled = false;
       btnAdd.innerText = "🛒 Agregar al changuito";
       btnAdd.style.background = "#008744";
@@ -233,8 +255,7 @@
     }
 
     function agregarAlCarrito() {
-      // Evitar agregar si ya fue procesado
-      const btnAdd = document.querySelector('.btn-add');
+      const btnAdd = document.getElementById('btn-add-main');
       if (btnAdd.disabled) return;
 
       carrito.push({
@@ -245,15 +266,16 @@
         subtotal: productoActual.precio * cantidadSeleccionada
       });
       actualizarCarritoUI();
-      // Feedback visual inmediato y bloqueo del botón
+
+      // Bloquear botón para que no se presione dos veces
       btnAdd.disabled = true;
-      btnAdd.innerText = "✔ ¡Agregado al changuito!";
+      btnAdd.innerText = "✔ ¡Agregado!";
       btnAdd.style.background = "#555";
 
-      // Vuelve automáticamente a la cámara tras 800ms
+      // Vuelve a la cámara en 600ms
       setTimeout(() => {
         reiniciarEscaneo();
-      }, 800);
+      }, 600);
     }
 
     function actualizarCarritoUI() {
@@ -291,16 +313,14 @@
       cerrarCarrito();
     }
 
-    function cerrarCarrito() {
-      document.getElementById('cart-modal').style.display = 'none';
-      // Si la ficha del producto seguía abierta de fondo, volver directamente a la cámara
-      if (document.getElementById('result-view').style.display === 'block') {
-        reiniciarEscaneo();
-      }
+    function abrirCarrito() {
+      document.getElementById('cart-modal').style.display = 'flex';
     }
 
     function cerrarCarrito() {
       document.getElementById('cart-modal').style.display = 'none';
+      // Forzar siempre la salida hacia la cámara activa
+      reiniciarEscaneo();
     }
 
     function reiniciarEscaneo() {
