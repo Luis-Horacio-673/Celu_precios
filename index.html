@@ -21,7 +21,7 @@
     
     .product-img { max-width: 200px; max-height: 200px; object-fit: contain; margin: 0 auto; display: block; }
     .timer-bar { height: 4px; background: #e0e0e0; border-radius: 2px; margin-top: 15px; overflow: hidden; }
-    .timer-fill { height: 100%; background: #d31319; width: 100%; animation: countdown 3s linear forwards; }
+    .timer-fill { height: 100%; background: #d31319; width: 100%; animation: countdown 2s linear forwards; }
     @keyframes countdown { from { width: 100%; } to { width: 0%; } }
 
     .label-box { border: 2px solid #222; border-radius: 6px; padding: 12px; text-align: left; background: #fff; }
@@ -63,7 +63,7 @@
   <header>
     <img class="logo-header" src="Logo de Coto.png" alt="COTO">
     <div id="sucursal-tag" class="store-badge">Cargando sucursal...</div>
-    <div style="font-size:0.7rem; color:#6c757d; margin-top:2px; font-weight:500;">v1.2 • Changuito seguro</div>
+    <div style="font-size:0.7rem; color:#6c757d; margin-top:2px; font-weight:500;">v1.3 • Changuito seguro (2s)</div>
   </header>
 
   <!-- Lector de Cámara -->
@@ -77,12 +77,12 @@
 
   <!-- Vista de Producto -->
   <div id="result-view">
-    <!-- Fase 1: Foto 3s -->
-    <div id="step-image" class="card">
+    <!-- Fase 1: Foto 2s (o tocar para avanzar directo) -->
+    <div id="step-image" class="card" onclick="mostrarEtiquetaDirecto()" style="cursor:pointer;" title="Toca para ver el precio de inmediato">
       <h3 id="step1-name" style="margin-top:0; font-size:1rem;"></h3>
       <img id="product-photo" class="product-img" src="" alt="Producto">
       <div class="timer-bar"><div class="timer-fill"></div></div>
-      <p style="font-size:0.75rem; color:#888; margin-top:8px;">Mostrando precio en 3 segundos...</p>
+      <p style="font-size:0.75rem; color:#888; margin-top:8px;">Mostrando precio en 2 segundos... <span style="color:#008744; font-weight:600;">(o toca la foto para saltar)</span></p>
     </div>
 
     <!-- Fase 2: Etiqueta Oficial + Selector de Cantidad -->
@@ -7590,9 +7590,14 @@
       actualizarSubtotalUI();
 
       timerTransition = setTimeout(() => {
-        document.getElementById('step-image').style.display = 'none';
-        document.getElementById('step-label').style.display = 'block';
-      }, 3000);
+        mostrarEtiquetaDirecto();
+      }, 2000);
+    }
+
+    function mostrarEtiquetaDirecto() {
+      clearTimeout(timerTransition);
+      document.getElementById('step-image').style.display = 'none';
+      document.getElementById('step-label').style.display = 'block';
     }
 
     function ajustarCantidad(delta) {
@@ -7737,4 +7742,3 @@
   </script>
 </body>
 </html>
-
