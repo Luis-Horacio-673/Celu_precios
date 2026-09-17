@@ -1,0 +1,118 @@
+﻿LEEME — lista de productos de Coto
+================================
+
+Hola. No hace falta saber de GitHub ni de programación.
+
+Adentro de esta carpeta hay 100 productos de Coto Digital
+(compra online) con:
+
+  • codigo_barras_EAN  = el código de barras
+  • descripcion        = el nombre del producto
+  • precio_en_pesos    = el precio en pesos argentinos
+
+Foto de precios: 16/09/2026 a las 16:51 (hora Argentina).
+Los precios pueden haber cambiado después de esa fecha.
+
+
+1) SI TODAVÍA NO DESCOMPRIMISTE EL ZIP
+--------------------------------------
+
+Estás buscando un archivo que se llama:
+
+    coto-100-productos.zip
+
+suele estar en la carpeta Descargas.
+
+WINDOWS (la de la tecla Inicio):
+  1. Abrí el Explorador de archivos (carpeta amarilla).
+  2. A la izquierda tocá "Descargas".
+  3. Buscá coto-100-productos.zip
+  4. Clic DERECHO encima del archivo.
+  5. Tocá "Extraer todo..."
+  6. Tocá el botón "Extraer".
+  7. Se abre una carpeta. Entrá a Coto-100-productos.
+  8. Abrí este archivo LEEME.txt (doble clic) si no lo estás leyendo.
+
+MAC:
+  1. Abrí Descargas.
+  2. Doble clic en coto-100-productos.zip
+  3. Se crea sola la carpeta Coto-100-productos. Entrá.
+
+
+2) ABRIR LA LISTA (USÁ EL ARCHIVO CSV)
+--------------------------------------
+
+El archivo que tenés que abrir se llama:
+
+    productos-coto.csv
+
+Ese es el de Excel / Google Drive.
+El otro (productos-coto.json) es para sistemas. Si no sabés qué es
+JSON, no lo toques.
+
+Opción A — la más fácil
+  1. Doble clic en productos-coto.csv
+  2. Si pregunta "¿con qué programa?", elegí Microsoft Excel.
+  3. Deberías ver una tabla con columnas (código, nombre, precio).
+
+Opción B — si no tenés Excel
+  1. Entrá a https://drive.google.com con tu mail.
+  2. Arrastrá productos-coto.csv adentro de Drive.
+  3. Cuando termine de subir, hacé doble clic.
+  4. Se abre como una planilla de Google.
+
+Opción C — si Excel te muestra TODO en una sola columna
+  1. Abrí Excel vacío (un libro nuevo).
+  2. Arriba tocá la pestaña "Datos".
+  3. Tocá "Obtener datos" → "Desde un archivo" → "Desde texto/CSV".
+  4. Elegí productos-coto.csv
+  5. Donde dice origen del archivo, poné UTF-8.
+  6. Tocá "Cargar".
+
+
+3) QUÉ ES CADA COLUMNA
+----------------------
+
+codigo_barras_EAN        El código de barras (el de la etiquetita).
+descripcion              Nombre del producto tal cual en Coto.
+precio_en_pesos          Precio en pesos. Punto = miles, no te asustes.
+precio_por_kilo_o_litro  Precio por kg o litro, si Coto lo informa.
+precio_sin_impuestos     Precio sin impuestos nacionales.
+marca                    Marca (COTO, ARCOR, DOVE, etc.).
+codigo_PLU_Coto          Código interno de Coto (PLU).
+departamento             Almacén, Frescos, Bebidas, Limpieza o Perfumería.
+categoria                Rubro más específico.
+link_coto                Página del producto en Coto Digital.
+                         Si no abre, copiá el texto y pegalo en Chrome.
+
+Hay 100 filas (sin contar el título de las columnas).
+Sucursal: Coto Digital online (código 200). NO es el precio de
+una sucursal de barrio; es el de la web.
+
+
+4) SI ALGO NO ANDA
+------------------
+
+No se baja el archivo
+  Volvé a la página y tocá otra vez el botón rojo grande
+  "Descargar el comprimido". Esperá a que termine. No cierres el navegador.
+
+Windows dice que el zip está dañado
+  Bajalo de nuevo. No lo abras desde WhatsApp si el chat lo
+  comprimió otra vez: pedí el LINK de la página, no el archivo reenviado.
+
+Se ven letras raras (Ã©, Ã³)
+  Usá la Opción C de Excel, con UTF-8.
+
+No encuentro Descargas
+  En Chrome: tres puntitos arriba a la derecha → Descargas.
+  Ahí aparece coto-100-productos.zip. Clic derecho → "Mostrar en carpeta".
+
+
+5) NO HAGAS ESTO
+----------------
+
+  • No hace falta GitHub.
+  • No hace falta instalar nada.
+  • No abras el .json si solo querés la lista.
+  • No edites el LEEME; es solo para leer.
