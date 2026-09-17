@@ -67,8 +67,11 @@
 
   <!-- Lector de Cámara -->
   <div id="reader-container">
-    <div id="reader"></div>
-    <p style="text-align:center; font-size: 0.8rem; color: #666; margin: 8px 0 0 0;">Apunta al código de barras</p>
+    <div id="reader" onclick="forzarReinicioCamara()" title="Toca para reiniciar cámara si se congela"></div>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; padding:0 4px;">
+      <p id="camera-status-msg" style="font-size: 0.8rem; color: #666; margin: 0;">Apunta al código de barras</p>
+      <button onclick="forzarReinicioCamara()" type="button" style="background:#f1f3f5; border:1px solid #ccc; border-radius:12px; padding:2px 10px; font-size:0.75rem; color:#444; cursor:pointer; font-weight:500;">🔄 Refrescar cámara</button>
+    </div>
   </div>
 
   <!-- Vista de Producto -->
@@ -7288,12 +7291,18 @@
   }
 };
 
+    const STORAGE_CARRITO_KEY = "coto_changuito_v1";
     let html5QrCode = null;
     let timerTransition = null;
     let productoActual = null;
     let cantidadSeleccionada = 1;
     let carrito = [];
     let camaraActiva = false;
+    let reiniciandoCamara = false;
+    let watchdogTimer = null;
+    let ultimoTiempoVideo = -1;
+    let contadorCongelamiento = 0;
+    let wakeLock = null;
 
     const formatearMoneda = (val) => {
       const num = Number(val) || 0;
@@ -7368,29 +7377,155 @@
       return null;
     }
 
-    function iniciarCamara() {
-      if (camaraActiva) return;
-      
-      const container = document.getElementById('reader-container');
-      if (container.style.display === 'none') return;
+    // --- GESTIÓN DE PANTALLA ACTIVA (WAKE LOCK API) ---
+    async function solicitarWakeLock() {
+      if ('wakeLock' in navigator) {
+        try {
+          wakeLock = await navigator.wakeLock.request('screen');
+          wakeLock.addEventListener('release', () => {
+            wakeLock = null;
+          });
+        } catch (err) {
+          console.warn("Wake Lock no disponible o denegado:", err);
+        }
+      }
+    }
 
-      if (!html5QrCode) {
-        html5QrCode = new Html5Qrcode("reader");
+    function liberarWakeLock() {
+      if (wakeLock !== null) {
+        wakeLock.release().then(() => {
+          wakeLock = null;
+        }).catch(() => {});
+      }
+    }
+
+    // --- WATCHDOG DE CÁMARA (DETECCIÓN DE CONGELAMIENTO POR SOFTWARE) ---
+    function iniciarWatchdog() {
+      detenerWatchdog();
+      ultimoTiempoVideo = -1;
+      contadorCongelamiento = 0;
+      watchdogTimer = setInterval(verificarEstadoCamara, 1200);
+    }
+
+    function detenerWatchdog() {
+      if (watchdogTimer) {
+        clearInterval(watchdogTimer);
+        watchdogTimer = null;
+      }
+    }
+
+    function verificarEstadoCamara() {
+      const container = document.getElementById('reader-container');
+      if (!container || container.style.display === 'none' || !camaraActiva || reiniciandoCamara) {
+        return;
       }
 
-      html5QrCode.start(
-        { facingMode: "environment" },
-        { fps: 15, qrbox: { width: 280, height: 180 } },
-        onScanSuccess
-      ).then(() => {
+      const videoEl = document.querySelector('#reader video');
+      if (!videoEl) return;
+
+      // Verificación 1: Track de video silenciado o cancelado por ahorro de energía del celular
+      if (videoEl.srcObject && typeof videoEl.srcObject.getVideoTracks === 'function') {
+        const tracks = videoEl.srcObject.getVideoTracks();
+        if (tracks.length > 0) {
+          const track = tracks[0];
+          if (track.readyState === 'ended' || track.muted) {
+            console.warn("Watchdog: Track de cámara finalizado/silenciado por el SO. Reiniciando...");
+            actualizarMensajeCamara("⚠️ Sensor pausado por el sistema. Reconectando...");
+            forzarReinicioCamara();
+            return;
+          }
+        }
+      }
+
+      // Verificación 2: El frame del video dejó de avanzar (currentTime no varía)
+      const current = videoEl.currentTime;
+      if (current > 0) {
+        if (current === ultimoTiempoVideo) {
+          contadorCongelamiento++;
+          // 2 ciclos consecutivos congelado (~2.4 a 3 segundos de inactividad de frames)
+          if (contadorCongelamiento >= 2) {
+            console.warn(`Watchdog: Cámara congelada detectada (currentTime = ${current}s). Reiniciando...`);
+            actualizarMensajeCamara("⚠️ Imagen congelada detectada. Reiniciando cámara...");
+            forzarReinicioCamara();
+            return;
+          }
+        } else {
+          ultimoTiempoVideo = current;
+          contadorCongelamiento = 0;
+        }
+      }
+    }
+
+    function actualizarMensajeCamara(msg) {
+      const el = document.getElementById('camera-status-msg');
+      if (el) {
+        el.innerText = msg;
+      }
+    }
+
+    // --- CICLO DE VIDA DE CÁMARA Y REINICIO LIMPIO ---
+    async function iniciarCamara() {
+      if (camaraActiva || reiniciandoCamara) return;
+      
+      const container = document.getElementById('reader-container');
+      if (container && container.style.display === 'none') return;
+
+      solicitarWakeLock();
+      actualizarMensajeCamara("Iniciando cámara...");
+
+      try {
+        if (!html5QrCode) {
+          html5QrCode = new Html5Qrcode("reader");
+        }
+
+        await html5QrCode.start(
+          { facingMode: "environment" },
+          { fps: 15, qrbox: { width: 280, height: 180 } },
+          onScanSuccess
+        );
+
         camaraActiva = true;
-      }).catch(err => {
+        actualizarMensajeCamara("Apunta al código de barras");
+        iniciarWatchdog();
+      } catch (err) {
         console.warn("Fallo al iniciar cámara:", err);
         camaraActiva = false;
-      });
+        actualizarMensajeCamara("⚠️ No se pudo iniciar la cámara. Toca aquí para reintentar");
+      }
+    }
+
+    async function forzarReinicioCamara() {
+      if (reiniciandoCamara) return;
+      reiniciandoCamara = true;
+      detenerWatchdog();
+      actualizarMensajeCamara("🔄 Restableciendo cámara...");
+
+      try {
+        if (html5QrCode) {
+          try {
+            await html5QrCode.stop();
+          } catch (e) {
+            console.warn("html5QrCode.stop advertencia:", e);
+          }
+          try {
+            html5QrCode.clear();
+          } catch (e) {}
+          html5QrCode = null;
+        }
+      } catch (e) {
+        console.warn("Error liberando instancia de cámara:", e);
+      } finally {
+        camaraActiva = false;
+        // Pausa breve para permitir al hardware liberar el dispositivo antes de volver a solicitarlo
+        setTimeout(async () => {
+          reiniciandoCamara = false;
+          await iniciarCamara();
+        }, 350);
+      }
     }
 
     function detenerCamaraYEjecutar(callback) {
+      detenerWatchdog();
       if (html5QrCode && camaraActiva) {
         html5QrCode.stop().then(() => {
           camaraActiva = false;
@@ -7400,6 +7535,7 @@
           if (callback) callback();
         });
       } else {
+        camaraActiva = false;
         if (callback) callback();
       }
     }
@@ -7471,6 +7607,30 @@
       document.getElementById('lbl-subtotal').innerText = formatearMoneda(subtotal);
     }
 
+    // --- GESTIÓN PERSISTENTE DEL CARRITO (LOCALSTORAGE) ---
+    function guardarCarritoEnStorage() {
+      try {
+        localStorage.setItem(STORAGE_CARRITO_KEY, JSON.stringify(carrito));
+      } catch (e) {
+        console.warn("Error al persistir carrito:", e);
+      }
+    }
+
+    function cargarCarritoGuardado() {
+      try {
+        const datos = localStorage.getItem(STORAGE_CARRITO_KEY);
+        if (datos) {
+          const parsed = JSON.parse(datos);
+          if (Array.isArray(parsed)) {
+            carrito = parsed;
+            actualizarCarritoUI();
+          }
+        }
+      } catch (e) {
+        console.warn("Error al cargar carrito guardado:", e);
+      }
+    }
+
     function agregarAlCarrito() {
       const btnAdd = document.getElementById('btn-add-main');
       if (btnAdd.disabled) return;
@@ -7486,6 +7646,7 @@
         cantidad: cantidadSeleccionada,
         subtotal: productoActual.precioCalculado * cantidadSeleccionada
       });
+      guardarCarritoEnStorage();
       actualizarCarritoUI();
 
       btnAdd.disabled = true;
@@ -7523,11 +7684,15 @@
 
     function eliminarDelCarrito(id) {
       carrito = carrito.filter(it => it.id !== id);
+      guardarCarritoEnStorage();
       actualizarCarritoUI();
     }
 
     function vaciarCarrito() {
       carrito = [];
+      try {
+        localStorage.removeItem(STORAGE_CARRITO_KEY);
+      } catch (e) {}
       actualizarCarritoUI();
       cerrarCarrito();
     }
@@ -7548,20 +7713,25 @@
       iniciarCamara();
     }
 
-    // GESTIÓN DE SEGUNDO PLANO / MULTITAREA
+    // --- GESTIÓN DE SEGUNDO PLANO / MULTITAREA ---
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) {
-        // Al salir de la app, apagar la cámara
+        liberarWakeLock();
         detenerCamaraYEjecutar();
       } else {
-        // Al regresar al navegador, reconectar la cámara en frío si estamos en el visor
+        solicitarWakeLock();
         if (document.getElementById('reader-container').style.display !== 'none') {
-          setTimeout(iniciarCamara, 300);
+          setTimeout(() => {
+            forzarReinicioCamara();
+          }, 300);
         }
       }
     });
 
-    window.addEventListener('DOMContentLoaded', iniciarCamara);
+    window.addEventListener('DOMContentLoaded', () => {
+      cargarCarritoGuardado();
+      iniciarCamara();
+    });
     
   </script>
 </body>
