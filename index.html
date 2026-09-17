@@ -868,7 +868,78 @@
     let carrito = [];
     let camaraActiva = false;
 
-    const formatearMoneda = (val) => "$ " + val.toLocaleString("es-AR");
+    const formatearMoneda = (val) => {
+      const num = Number(val) || 0;
+      return "$ " + num.toLocaleString("es-AR", {
+        minimumFractionDigits: num % 1 === 0 ? 0 : 2,
+        maximumFractionDigits: 2
+      });
+    };
+
+    function buscarProducto(codigoRaw) {
+      const codigo = String(codigoRaw).trim();
+
+      // 1. Coincidencia directa exacta (productos envasados o códigos de catálogo)
+      if (DB_PRODUCTOS[codigo]) {
+        return {
+          ...DB_PRODUCTOS[codigo],
+          codigo: codigo,
+          esPesable: false,
+          pesoKg: null,
+          precioOriginal: DB_PRODUCTOS[codigo].precio,
+          precioCalculado: DB_PRODUCTOS[codigo].precio
+        };
+      }
+
+      // 2. Detección de producto de balanza / peso variable (Estándar GS1 prefijo 20 a 29, típicamente 25)
+      // Estructura oficial: [Prefijo 2 dígitos][PLU 5 dígitos][Gramos 5 dígitos][Check 1 dígito]
+      // Ejemplo: 25 00695 00545 1 -> 545 gramos de PLU 00695 (Papa Blanca)
+      if (codigo.length === 13 && /^(20|21|22|23|24|25|26|27|28|29)/.test(codigo)) {
+        const plu = codigo.substring(2, 7);
+        const gramos = parseInt(codigo.substring(7, 12), 10);
+        const pesoKg = gramos / 1000;
+
+        for (const [keyEan, prod] of Object.entries(DB_PRODUCTOS)) {
+          if (keyEan.length === 13 && /^(20|25)/.test(keyEan)) {
+            const prodPlu = (keyEan.substring(2, 7) !== '00000') ? keyEan.substring(2, 7) : keyEan.substring(7, 12);
+            if (prodPlu === plu) {
+              if (gramos > 0) {
+                // Producto con peso específico de balanza
+                const precioCalculado = Math.round(pesoKg * prod.precio * 100) / 100;
+                const pesoTexto = pesoKg < 1
+                  ? `${gramos} gr`
+                  : `${pesoKg.toLocaleString('es-AR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg`;
+
+                return {
+                  ...prod,
+                  codigo: codigo,
+                  codigoBase: keyEan,
+                  esPesable: true,
+                  pesoKg: pesoKg,
+                  gramos: gramos,
+                  precioOriginal: prod.precio, // Precio por kilo según catálogo
+                  precioCalculado: precioCalculado, // Importe total calculado de la bolsa
+                  pesoTexto: pesoTexto
+                };
+              } else {
+                // Código genérico sin peso
+                return {
+                  ...prod,
+                  codigo: codigo,
+                  codigoBase: keyEan,
+                  esPesable: false,
+                  pesoKg: null,
+                  precioOriginal: prod.precio,
+                  precioCalculado: prod.precio
+                };
+              }
+            }
+          }
+        }
+      }
+
+      return null;
+    }
 
     function iniciarCamara() {
       if (camaraActiva) return;
@@ -909,9 +980,10 @@
     function onScanSuccess(decodedText) {
       // Limpieza de caracteres invisibles o errores de lectura
       const codigoLimpio = String(decodedText).trim();
+      const productoEncontrado = buscarProducto(codigoLimpio);
 
-      if (DB_PRODUCTOS[codigoLimpio]) {
-        productoActual = { ...DB_PRODUCTOS[codigoLimpio], codigo: codigoLimpio };
+      if (productoEncontrado) {
+        productoActual = productoEncontrado;
         cantidadSeleccionada = 1;
 
         detenerCamaraYEjecutar(() => {
@@ -933,13 +1005,23 @@
       btnAdd.innerText = "🛒 Agregar al changuito";
       btnAdd.style.background = "#008744";
 
-      document.getElementById('step1-name').innerText = prod.nombre;
+      // Fase 1: Foto (en productos pesables mostramos el peso de la bolsa)
+      document.getElementById('step1-name').innerText = prod.esPesable
+        ? `${prod.nombre} (${prod.pesoTexto})`
+        : prod.nombre;
       document.getElementById('product-photo').src = prod.imagen;
 
+      // Fase 2: Etiqueta Oficial
       document.getElementById('lbl-title').innerText = prod.nombre;
-      document.getElementById('lbl-price').innerText = formatearMoneda(prod.precio);
-      document.getElementById('lbl-tax').innerText = prod.sinImpuestos;
-      document.getElementById('lbl-sub').innerText = prod.detalleUnidad;
+      document.getElementById('lbl-price').innerText = formatearMoneda(prod.precioCalculado);
+
+      if (prod.esPesable) {
+        document.getElementById('lbl-tax').innerText = `PESO: ${prod.pesoTexto} — PRECIO X KG: ${formatearMoneda(prod.precioOriginal)}`;
+        document.getElementById('lbl-sub').innerText = prod.sinImpuestos;
+      } else {
+        document.getElementById('lbl-tax').innerText = prod.sinImpuestos;
+        document.getElementById('lbl-sub').innerText = prod.detalleUnidad;
+      }
 
       actualizarSubtotalUI();
 
@@ -958,7 +1040,7 @@
 
     function actualizarSubtotalUI() {
       document.getElementById('qty-value').innerText = cantidadSeleccionada;
-      const subtotal = productoActual.precio * cantidadSeleccionada;
+      const subtotal = productoActual.precioCalculado * cantidadSeleccionada;
       document.getElementById('lbl-subtotal').innerText = formatearMoneda(subtotal);
     }
 
@@ -966,12 +1048,16 @@
       const btnAdd = document.getElementById('btn-add-main');
       if (btnAdd.disabled) return;
 
+      const descItem = productoActual.esPesable
+        ? `${productoActual.nombre} (${productoActual.pesoTexto})`
+        : productoActual.nombre;
+
       carrito.push({
         id: Date.now(),
-        nombre: productoActual.nombre,
-        precioUnitario: productoActual.precio,
+        nombre: descItem,
+        precioUnitario: productoActual.precioCalculado,
         cantidad: cantidadSeleccionada,
-        subtotal: productoActual.precio * cantidadSeleccionada
+        subtotal: productoActual.precioCalculado * cantidadSeleccionada
       });
       actualizarCarritoUI();
 
