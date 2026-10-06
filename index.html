@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>Verificador y Carrito</title>
-  <script src="https://unpkg.com/html5-qrcode"></script>
+  <script src="html5-qrcode.min.js"></script>
   <style>
     * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { margin: 0; padding: 12px; padding-bottom: 95px; background: #f0f2f5; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
@@ -52,10 +52,16 @@
     .btn-remove { color: #d31319; border: none; background: transparent; font-weight: bold; font-size: 1.1rem; padding: 4px 8px; cursor: pointer; }
     .btn-close-cart { background: #111; color: #fff; border: none; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 8px; }
 
-    /* Promociones */
+    /* Promociones y Ofertas */
     .promo-section { width: 100%; max-width: 420px; margin-top: 14px; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
     .promo-banner { width: 100%; height: auto; display: block; }
     .promo-footer { padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; }
+
+    /* Buscador manual */
+    .search-result-item { display: flex; gap: 10px; align-items: center; padding: 10px 8px; border-bottom: 1px solid #eee; cursor: pointer; transition: background 0.15s; }
+    .search-result-item:hover, .search-result-item:active { background: #f8f9fa; }
+    .badge-promo { font-size: 0.68rem; background: #d31319; color: #fff; padding: 2px 7px; border-radius: 6px; font-weight: 700; white-space: nowrap; }
+    .price-regular-cut { text-decoration: line-through; color: #777; font-size: 0.85rem; margin-right: 4px; }
   </style>
 </head>
 <body>
@@ -63,7 +69,7 @@
   <header>
     <img class="logo-header" src="Logo de Coto.png" alt="COTO">
     <div id="sucursal-tag" class="store-badge">Cargando sucursal...</div>
-    <div style="font-size:0.7rem; color:#6c757d; margin-top:2px; font-weight:500;">v1.4 • 2.520 productos (2s)</div>
+    <div style="font-size:0.7rem; color:#6c757d; margin-top:2px; font-weight:500;">v1.5 • Precios en Vivo & Respaldo Offline</div>
   </header>
 
   <!-- Lector de Cámara -->
@@ -75,11 +81,49 @@
     </div>
   </div>
 
+  <!-- Buscador Manual por Nombre o Código EAN -->
+  <div id="search-container" style="width: 100%; max-width: 420px; margin-top: 10px; background: #fff; border-radius: 12px; padding: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.06);">
+    <div style="display:flex; gap: 8px;">
+      <div style="position:relative; flex: 1;">
+        <input type="text" id="search-input" placeholder="🔍 Escribe nombre (ej: Pepitos, Coca)..." 
+          style="width: 100%; padding: 10px 32px 10px 12px; border: 1.5px solid #ced4da; border-radius: 8px; font-size: 0.9rem; outline: none; box-sizing: border-box;"
+          onkeydown="if(event.key === 'Enter') buscarProductosTexto()"
+        >
+        <button id="btn-clear-search" onclick="limpiarBusquedaTexto()" style="display:none; position:absolute; right:8px; top:50%; transform:translateY(-50%); background:none; border:none; color:#999; font-size:1.1rem; cursor:pointer; padding:0 4px;">✕</button>
+      </div>
+      <button onclick="buscarProductosTexto()" style="background: #d31319; color: #fff; border: none; padding: 0 16px; border-radius: 8px; font-weight: bold; font-size: 0.85rem; cursor: pointer;">Buscar</button>
+    </div>
+    <div id="search-loading" style="display:none; font-size: 0.8rem; color: #666; margin-top: 8px; text-align: center;">⏳ Buscando ofertas y productos en Coto...</div>
+    <div id="search-results-list" style="display:none; margin-top: 10px; max-height: 270px; overflow-y: auto; border-top: 1px solid #f0f0f0; padding-top: 6px;"></div>
+  </div>
+
   <!-- Vista de Producto -->
   <div id="result-view">
+    <!-- Estado de Búsqueda Online (para productos no guardados localmente) -->
+    <div id="step-loading" class="card" style="display: none; padding: 25px 15px;">
+      <div style="font-size: 2.2rem; margin-bottom: 8px;">🔍</div>
+      <h3 style="margin: 0; font-size: 1.05rem; color: #333;">Consultando Coto Digital...</h3>
+      <p id="loading-code-txt" style="font-size: 0.82rem; color: #666; margin: 8px 0;"></p>
+      <div class="timer-bar"><div class="timer-fill" style="animation: countdown 1.8s linear infinite;"></div></div>
+    </div>
+
+    <!-- Estado No Encontrado -->
+    <div id="step-notfound" class="card" style="display: none; padding: 22px 15px;">
+      <div style="font-size: 2.2rem; margin-bottom: 8px;">❌</div>
+      <h3 style="margin: 0 0 6px 0; font-size: 1.05rem; color: #d31319;">Producto no registrado</h3>
+      <p id="notfound-code-txt" style="font-size: 0.85rem; color: #555; margin-bottom: 15px;"></p>
+      <button class="btn-cancel" onclick="reiniciarEscaneo()" style="width:100%; background:#111; padding:12px; font-size:0.9rem;">Escanear otro producto</button>
+    </div>
+
     <!-- Fase 1: Foto 2s (o tocar para avanzar directo) -->
     <div id="step-image" class="card" onclick="mostrarEtiquetaDirecto()" style="cursor:pointer;" title="Toca para ver el precio de inmediato">
-      <h3 id="step1-name" style="margin-top:0; font-size:1rem;"></h3>
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px; gap:6px;">
+        <h3 id="step1-name" style="margin:0; font-size:1rem; text-align:left;"></h3>
+        <div style="display:flex; flex-direction:column; align-items:flex-end; gap:3px;">
+          <span id="step1-badge" style="font-size:0.68rem; padding:2px 8px; border-radius:10px; font-weight:700; white-space:nowrap;"></span>
+          <span id="step1-badge-promo" style="display:none; font-size:0.7rem; background:#d31319; color:#fff; padding:2px 8px; border-radius:10px; font-weight:bold; white-space:nowrap;"></span>
+        </div>
+      </div>
       <img id="product-photo" class="product-img" src="" alt="Producto" onerror="this.onerror=null; this.src='Logo de Coto.png';">
       <div class="timer-bar"><div class="timer-fill"></div></div>
       <p style="font-size:0.75rem; color:#888; margin-top:8px;">Mostrando precio en 2 segundos... <span style="color:#008744; font-weight:600;">(o toca la foto para saltar)</span></p>
@@ -88,8 +132,20 @@
     <!-- Fase 2: Etiqueta Oficial + Selector de Cantidad -->
     <div id="step-label" class="card" style="display: none;">
       <div class="label-box">
-        <div id="lbl-title" class="label-title"></div>
-        <div id="lbl-price" class="label-price"></div>
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:6px; margin-bottom:4px;">
+          <div id="lbl-title" class="label-title" style="margin-bottom:0;"></div>
+          <div style="display:flex; flex-direction:column; align-items:flex-end; gap:3px;">
+            <span id="lbl-badge-source" style="font-size:0.68rem; padding:2px 8px; border-radius:10px; font-weight:700; white-space:nowrap;"></span>
+            <span id="lbl-badge-promo" style="display:none; font-size:0.7rem; background:#d31319; color:#fff; padding:2px 8px; border-radius:10px; font-weight:bold; white-space:nowrap;"></span>
+          </div>
+        </div>
+        <div id="lbl-price-container" style="margin: 6px 0;">
+          <div id="lbl-price-regular-box" style="display:none; font-size: 0.92rem; color: #777;">
+            Precio regular: <span id="lbl-price-regular" style="text-decoration: line-through; font-weight: bold;"></span>
+          </div>
+          <div id="lbl-price" class="label-price" style="margin: 2px 0;"></div>
+          <div id="lbl-promo-cond" style="display:none; font-size: 0.8rem; color: #c5221f; font-weight: 700; margin-top: 2px;"></div>
+        </div>
         <div id="lbl-tax" class="label-tax"></div>
         <div id="lbl-sub" class="label-sub"></div>
       </div>
@@ -124,6 +180,7 @@
     <div class="cart-summary">
       <span id="cart-count-txt" class="cart-items-count">0 productos en total</span>
       <span id="cart-total-txt" class="cart-total">$ 0</span>
+      <span id="cart-offline-warn" style="font-size:0.68rem; color:#ffb74d; display:none; margin-top:2px; font-weight:600;">⚠️ Incluye precios de catálogo</span>
     </div>
     <span style="font-size: 0.85rem; font-weight:bold; background: #333; padding: 6px 12px; border-radius: 8px;">Ver changuito ▲</span>
   </div>
@@ -17783,7 +17840,6 @@
     "detalleUnidad": "PRECIO X LT: $ 64,40",
     "imagen": "https://static.cotodigital3.com.ar/sitios/fotos/large/00501600/00501630.jpg"
   },
-      "77900661": { nombre: "Sal fina CELUSAL 100-gr", precio: 2129, sinImpuestos: "PRECIO SIN IMPUESTOS NACIONALES: $1.759,50", detalleUnidad: "PRECIO X KG: $21290", imagen: "77900661_Celusal 100gr.png" },
   "7790315100979": {
     "nombre": "Agua Con Gas Citrus Pasión Ser Bot 2.25 Ltr",
     "precio": 156.45,
@@ -17793,18 +17849,24 @@
   }
 };
 
+
     const STORAGE_CARRITO_KEY = "coto_changuito_v1";
+    const STORAGE_CACHE_KEY = "coto_catalogo_cache_v1";
+    const COTO_API_KEY = "key_r6xzz4IAoTWcipni";
+
     let html5QrCode = null;
     let timerTransition = null;
     let productoActual = null;
     let cantidadSeleccionada = 1;
     let carrito = [];
+    let catalogoCache = {};
     let camaraActiva = false;
     let reiniciandoCamara = false;
     let watchdogTimer = null;
     let ultimoTiempoVideo = -1;
     let contadorCongelamiento = 0;
     let wakeLock = null;
+    let busquedaOnlineController = null;
 
     const formatearMoneda = (val) => {
       const num = Number(val) || 0;
@@ -17814,10 +17876,71 @@
       });
     };
 
-    function buscarProducto(codigoRaw) {
+    const format_ar = (val) => {
+      const num = Number(val) || 0;
+      return num.toLocaleString("es-AR", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+    };
+
+    function parsearUnidad(formato) {
+      const f = String(formato || '').toLowerCase();
+      if (f.includes('escurrido')) return 'KG ESCURRIDO';
+      if (f.includes('kilo')) return 'KG';
+      if (f.includes('litro')) return 'LT';
+      if (f.includes('cuadrado')) return 'M2';
+      if (f.includes('unidad')) return 'UN';
+      return f.toUpperCase() || 'UN';
+    }
+
+    // --- GESTIÓN DE CACHÉ LOCAL DEL CELULAR (SMART CACHE) ---
+    function cargarCatalogoCache() {
+      try {
+        const raw = localStorage.getItem(STORAGE_CACHE_KEY);
+        if (raw) catalogoCache = JSON.parse(raw);
+      } catch (e) {
+        console.warn("Error leyendo caché de productos:", e);
+      }
+    }
+
+    function guardarEnCatalogoCache(ean, prod) {
+      try {
+        catalogoCache[ean] = {
+          nombre: prod.nombre,
+          precio: prod.precio,
+          precioOriginal: prod.precioOriginal || prod.precioLista || prod.precio,
+          sinImpuestos: prod.sinImpuestos,
+          detalleUnidad: prod.detalleUnidad,
+          imagen: prod.imagen,
+          promo: prod.promo || null,
+          timestamp: Date.now()
+        };
+        localStorage.setItem(STORAGE_CACHE_KEY, JSON.stringify(catalogoCache));
+      } catch (e) {
+        console.warn("Error guardando en caché:", e);
+      }
+    }
+
+    // --- BÚSQUEDA LOCAL (CACHÉ CELULAR + 2.500 CATÁLOGO BASE + BALANZA) ---
+    function buscarProductoLocal(codigoRaw) {
       const codigo = String(codigoRaw).trim();
 
-      // 1. Coincidencia directa exacta (productos envasados o códigos de catálogo)
+      // 1. Memoria del propio celular (precios frescos previamente escaneados con promos)
+      if (catalogoCache[codigo]) {
+        return {
+          ...catalogoCache[codigo],
+          codigo: codigo,
+          esPesable: false,
+          pesoKg: null,
+          precioOriginal: catalogoCache[codigo].precioOriginal || catalogoCache[codigo].precio,
+          precioCalculado: catalogoCache[codigo].precio,
+          promo: catalogoCache[codigo].promo || null,
+          origen: 'cache'
+        };
+      }
+
+      // 2. Coincidencia directa en el catálogo base de 2.520 productos
       if (DB_PRODUCTOS[codigo]) {
         return {
           ...DB_PRODUCTOS[codigo],
@@ -17825,58 +17948,356 @@
           esPesable: false,
           pesoKg: null,
           precioOriginal: DB_PRODUCTOS[codigo].precio,
-          precioCalculado: DB_PRODUCTOS[codigo].precio
+          precioCalculado: DB_PRODUCTOS[codigo].precio,
+          origen: 'base'
         };
       }
 
-      // 2. Detección de producto de balanza / peso variable (Estándar GS1 prefijo 20 a 29, típicamente 25)
-      // Estructura oficial: [Prefijo 2 dígitos][PLU 5 dígitos][Gramos 5 dígitos][Check 1 dígito]
-      // Ejemplo: 25 00695 00545 1 -> 545 gramos de PLU 00695 (Papa Blanca)
+      // 3. Detección de producto pesable / balanza (GS1 prefijo 20 a 29)
       if (codigo.length === 13 && /^(20|21|22|23|24|25|26|27|28|29)/.test(codigo)) {
         const plu = codigo.substring(2, 7);
         const gramos = parseInt(codigo.substring(7, 12), 10);
         const pesoKg = gramos / 1000;
+        const codigoBase = "20" + plu + "000000";
 
+        const prodEncontrado = catalogoCache[codigoBase] || DB_PRODUCTOS[codigoBase];
+        if (prodEncontrado) {
+          const precioCalculado = Math.round(pesoKg * prodEncontrado.precio * 100) / 100;
+          const pesoTexto = pesoKg < 1
+            ? `${gramos} gr`
+            : `${pesoKg.toLocaleString('es-AR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg`;
+          return {
+            ...prodEncontrado,
+            codigo: codigo,
+            codigoBase: codigoBase,
+            esPesable: true,
+            pesoKg: pesoKg,
+            gramos: gramos,
+            precioOriginal: prodEncontrado.precio,
+            precioCalculado: precioCalculado,
+            pesoTexto: pesoTexto,
+            origen: catalogoCache[codigoBase] ? 'cache' : 'base'
+          };
+        }
+
+        // Búsqueda por PLU en DB_PRODUCTOS
         for (const [keyEan, prod] of Object.entries(DB_PRODUCTOS)) {
           if (keyEan.length === 13 && /^(20|25)/.test(keyEan)) {
             const prodPlu = (keyEan.substring(2, 7) !== '00000') ? keyEan.substring(2, 7) : keyEan.substring(7, 12);
             if (prodPlu === plu) {
-              if (gramos > 0) {
-                // Producto con peso específico de balanza
-                const precioCalculado = Math.round(pesoKg * prod.precio * 100) / 100;
-                const pesoTexto = pesoKg < 1
-                  ? `${gramos} gr`
-                  : `${pesoKg.toLocaleString('es-AR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg`;
-
-                return {
-                  ...prod,
-                  codigo: codigo,
-                  codigoBase: keyEan,
-                  esPesable: true,
-                  pesoKg: pesoKg,
-                  gramos: gramos,
-                  precioOriginal: prod.precio, // Precio por kilo según catálogo
-                  precioCalculado: precioCalculado, // Importe total calculado de la bolsa
-                  pesoTexto: pesoTexto
-                };
-              } else {
-                // Código genérico sin peso
-                return {
-                  ...prod,
-                  codigo: codigo,
-                  codigoBase: keyEan,
-                  esPesable: false,
-                  pesoKg: null,
-                  precioOriginal: prod.precio,
-                  precioCalculado: prod.precio
-                };
-              }
+              const precioCalculado = Math.round(pesoKg * prod.precio * 100) / 100;
+              const pesoTexto = pesoKg < 1
+                ? `${gramos} gr`
+                : `${pesoKg.toLocaleString('es-AR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg`;
+              return {
+                ...prod,
+                codigo: codigo,
+                codigoBase: keyEan,
+                esPesable: true,
+                pesoKg: pesoKg,
+                gramos: gramos,
+                precioOriginal: prod.precio,
+                precioCalculado: precioCalculado,
+                pesoTexto: pesoTexto,
+                origen: 'base'
+              };
             }
           }
         }
       }
 
       return null;
+    }
+
+    // --- PARSEO Y EXTRACCIÓN DE OFERTAS DEL DÍA ---
+    function parsearPrecioString(val) {
+      if (typeof val === 'number') return val;
+      if (!val) return null;
+      let s = String(val).replace(/[^\d.,]/g, '').trim();
+      if (s.includes('.') && s.includes(',')) {
+        s = s.replace(/\./g, '').replace(',', '.');
+      } else if (s.includes(',')) {
+        s = s.replace(',', '.');
+      }
+      const n = parseFloat(s);
+      return isNaN(n) ? null : n;
+    }
+
+    function extraerPromoDeResultado(rMatch) {
+      if (!rMatch || !rMatch.data) return null;
+      const dt = rMatch.data;
+      const discounts = dt.discounts || [];
+      const saleTypes = dt.sale_type || [];
+
+      if (discounts.length === 0 && saleTypes.length === 0) return null;
+
+      if (discounts.length > 0) {
+        const d0 = discounts[0];
+        const precioOferta = parsearPrecioString(d0.discountPrice);
+        const esComunidad = (d0.discountImage && String(d0.discountImage).includes('comunidad')) ||
+                            saleTypes.some(st => String(st).toLowerCase().includes('comunidad'));
+        let texto = d0.discountText || '';
+        if (!texto && esComunidad) texto = 'Comunidad Coto';
+        if (!texto) texto = 'Oferta';
+
+        return {
+          tienePromo: true,
+          textoPromo: texto,
+          condicion: d0.takingText || '',
+          comentarios: d0.comments || '',
+          precioOferta: precioOferta,
+          esComunidad: esComunidad
+        };
+      }
+
+      const promoType = saleTypes.find(st => st !== 'Todas las Ofertas');
+      if (promoType) {
+        return {
+          tienePromo: true,
+          textoPromo: promoType,
+          condicion: '',
+          comentarios: '',
+          precioOferta: null,
+          esComunidad: String(promoType).toLowerCase().includes('comunidad')
+        };
+      }
+
+      return null;
+    }
+
+    // --- CONSULTA EN VIVO A LA API DE COTO DIGITAL ---
+    async function consultarCotoEnVivo(queryCode, timeoutMs = 1800) {
+      if (busquedaOnlineController) {
+        try { busquedaOnlineController.abort(); } catch (e) {}
+      }
+      busquedaOnlineController = new AbortController();
+      const signal = busquedaOnlineController.signal;
+      const timer = setTimeout(() => {
+        try { busquedaOnlineController.abort(); } catch (e) {}
+      }, timeoutMs);
+
+      try {
+        const q = encodeURIComponent(queryCode);
+        const url = `https://ac.cnstrc.com/search/${q}?key=${COTO_API_KEY}&c=ciojs-client-2.1468.0&num_results_per_page=4`;
+        const res = await fetch(url, { signal });
+        clearTimeout(timer);
+        if (!res.ok) return null;
+
+        const data = await res.json();
+        const results = data?.response?.results || [];
+        if (results.length === 0) return null;
+
+        // Buscar coincidencia exacta por EAN
+        let rMatch = results.find(r => String(r.data?.product_main_ean || '').trim() === queryCode);
+        if (!rMatch && results.length > 0) {
+          rMatch = results[0];
+        }
+
+        const dt = rMatch.data || {};
+        const prices = dt.price || [];
+        let pStore = prices.find(p => String(p.store) === '200') || (prices.length > 0 ? prices[0] : null);
+        if (!pStore || !pStore.listPrice) return null;
+
+        const listPrice = Number(pStore.listPrice) || 0;
+        const priceNoTax = Number(pStore.priceWithoutTax) || Math.round((listPrice / 1.21) * 100) / 100;
+        const unitPrice = Number(pStore.formatPrice) || listPrice;
+        const formatStr = dt.product_format || 'Unidad';
+        const unitLabel = parsearUnidad(formatStr);
+        const imgUrl = dt.image_url || dt.product_large_image_url || 'Logo de Coto.png';
+        const name = (rMatch.value || dt.description || 'Producto Coto').trim();
+
+        const promo = extraerPromoDeResultado(rMatch);
+        const precioEfectivo = (promo && promo.precioOferta && promo.precioOferta > 0) ? promo.precioOferta : listPrice;
+
+        return {
+          nombre: name,
+          precio: precioEfectivo,
+          precioLista: listPrice,
+          promo: promo,
+          sinImpuestos: `PRECIO SIN IMPUESTOS NACIONALES: $ ${format_ar(priceNoTax)}`,
+          detalleUnidad: `PRECIO X ${unitLabel}: $ ${format_ar(unitPrice)}`,
+          imagen: imgUrl,
+          codigo: String(dt.product_main_ean || queryCode).trim()
+        };
+      } catch (err) {
+        clearTimeout(timer);
+        return null;
+      }
+    }
+
+    // --- PROCESADOR PRINCIPAL DE ESCANEO (HÍBRIDO: EN VIVO + CACHÉ + OFFLINE) ---
+    async function procesarYEscanearProducto(codigoLimpio) {
+      let esPesable = false;
+      let pesoKg = 0;
+      let gramos = 0;
+      let codigoConsulta = codigoLimpio;
+
+      if (codigoLimpio.length === 13 && /^(20|21|22|23|24|25|26|27|28|29)/.test(codigoLimpio)) {
+        esPesable = true;
+        const plu = codigoLimpio.substring(2, 7);
+        gramos = parseInt(codigoLimpio.substring(7, 12), 10);
+        pesoKg = gramos / 1000;
+        codigoConsulta = "20" + plu + "000000";
+      }
+
+      const prodLocal = buscarProductoLocal(codigoLimpio);
+
+      if (prodLocal) {
+        // CASO 1: Producto local existente -> Mostrar en 0ms
+        productoActual = { ...prodLocal, esOnline: false };
+        cantidadSeleccionada = 1;
+        mostrarProducto(productoActual, 'verificando');
+
+        // En paralelo, revalidar precio en vivo (timeout 1.8s)
+        consultarCotoEnVivo(codigoConsulta, 1800).then(prodOnline => {
+          if (prodOnline && productoActual && productoActual.codigo === codigoLimpio) {
+            actualizarProductoConDatosEnVivo(prodOnline, esPesable, pesoKg, gramos, codigoConsulta);
+          } else {
+            actualizarBadgesFuente('offline');
+          }
+        }).catch(() => {
+          actualizarBadgesFuente('offline');
+        });
+
+      } else {
+        // CASO 2: Producto NO existente localmente -> Consultar Coto Digital en vivo
+        mostrarPantallaCargando(codigoLimpio);
+
+        try {
+          const prodOnline = await consultarCotoEnVivo(codigoConsulta, 2500);
+          if (prodOnline) {
+            let prodFormateado;
+            if (esPesable && gramos > 0) {
+              const precioCalculado = Math.round(pesoKg * prodOnline.precio * 100) / 100;
+              const pesoTexto = pesoKg < 1
+                ? `${gramos} gr`
+                : `${pesoKg.toLocaleString('es-AR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg`;
+              prodFormateado = {
+                ...prodOnline,
+                codigo: codigoLimpio,
+                codigoBase: codigoConsulta,
+                esPesable: true,
+                pesoKg: pesoKg,
+                gramos: gramos,
+                precioOriginal: prodOnline.precioLista || prodOnline.precio,
+                precioCalculado: precioCalculado,
+                pesoTexto: pesoTexto,
+                esOnline: true,
+                promo: prodOnline.promo || null
+              };
+            } else {
+              prodFormateado = {
+                ...prodOnline,
+                codigo: codigoLimpio,
+                esPesable: false,
+                pesoKg: null,
+                precioOriginal: prodOnline.precioLista || prodOnline.precio,
+                precioCalculado: prodOnline.precio,
+                esOnline: true,
+                promo: prodOnline.promo || null
+              };
+            }
+
+            // Guardar en la caché local del teléfono
+            guardarEnCatalogoCache(codigoConsulta, prodOnline);
+
+            productoActual = prodFormateado;
+            cantidadSeleccionada = 1;
+            ocultarPantallasEspeciales();
+            mostrarProducto(productoActual, 'online');
+          } else {
+            // No encontrado ni local ni online
+            ocultarPantallasEspeciales();
+            mostrarPantallaNoEncontrado(codigoLimpio);
+          }
+        } catch (e) {
+          ocultarPantallasEspeciales();
+          mostrarPantallaNoEncontrado(codigoLimpio);
+        }
+      }
+    }
+
+    function actualizarProductoConDatosEnVivo(prodOnline, esPesable, pesoKg, gramos, codigoConsulta) {
+      if (!productoActual) return;
+
+      productoActual.precioOriginal = prodOnline.precioLista || prodOnline.precio;
+      productoActual.promo = prodOnline.promo || null;
+
+      if (esPesable && gramos > 0) {
+        productoActual.precioCalculado = Math.round(pesoKg * prodOnline.precio * 100) / 100;
+        document.getElementById('lbl-tax').innerText = `PESO: ${productoActual.pesoTexto} — PRECIO X KG: ${formatearMoneda(productoActual.precioOriginal)}`;
+      } else {
+        productoActual.precioCalculado = prodOnline.precio;
+        document.getElementById('lbl-tax').innerText = prodOnline.sinImpuestos;
+      }
+
+      productoActual.sinImpuestos = prodOnline.sinImpuestos;
+      productoActual.detalleUnidad = prodOnline.detalleUnidad;
+      productoActual.imagen = prodOnline.imagen;
+      productoActual.esOnline = true;
+
+      // Actualizar foto y etiquetas en pantalla
+      document.getElementById('product-photo').src = prodOnline.imagen;
+      actualizarEtiquetaPrecioUI(productoActual);
+      actualizarSubtotalUI();
+      actualizarBadgesFuente('online');
+
+      // Guardar en la caché del celular para la próxima
+      guardarEnCatalogoCache(codigoConsulta, prodOnline);
+    }
+
+    function actualizarBadgesFuente(estado) {
+      const b1 = document.getElementById('step1-badge');
+      const b2 = document.getElementById('lbl-badge-source');
+      if (!b1 || !b2) return;
+
+      if (estado === 'verificando') {
+        b1.style.background = "#fff3cd";
+        b1.style.color = "#856404";
+        b1.innerText = "⏳ Verificando en vivo...";
+        b2.style.background = "#fff3cd";
+        b2.style.color = "#856404";
+        b2.innerText = "⏳ Verificando...";
+      } else if (estado === 'online') {
+        b1.style.background = "#e6f4ea";
+        b1.style.color = "#137333";
+        b1.innerText = "🟢 En vivo";
+        b2.style.background = "#e6f4ea";
+        b2.style.color = "#137333";
+        b2.innerText = "🟢 Precio en vivo";
+      } else {
+        b1.style.background = "#fce8e6";
+        b1.style.color = "#c5221f";
+        b1.innerText = "⚠️ Catálogo offline";
+        b2.style.background = "#fce8e6";
+        b2.style.color = "#c5221f";
+        b2.innerText = "⚠️ Precio offline";
+      }
+    }
+
+    function mostrarPantallaCargando(codigo) {
+      document.getElementById('reader-container').style.display = 'none';
+      document.getElementById('result-view').style.display = 'block';
+      document.getElementById('step-image').style.display = 'none';
+      document.getElementById('step-label').style.display = 'none';
+      document.getElementById('step-notfound').style.display = 'none';
+      document.getElementById('step-loading').style.display = 'block';
+      document.getElementById('loading-code-txt').innerText = `Código: ${codigo}`;
+    }
+
+    function mostrarPantallaNoEncontrado(codigo) {
+      document.getElementById('reader-container').style.display = 'none';
+      document.getElementById('result-view').style.display = 'block';
+      document.getElementById('step-image').style.display = 'none';
+      document.getElementById('step-label').style.display = 'none';
+      document.getElementById('step-loading').style.display = 'none';
+      document.getElementById('step-notfound').style.display = 'block';
+      document.getElementById('notfound-code-txt').innerText = `El código ${codigo} no fue encontrado en el catálogo local ni en Coto Digital.`;
+    }
+
+    function ocultarPantallasEspeciales() {
+      document.getElementById('step-loading').style.display = 'none';
+      document.getElementById('step-notfound').style.display = 'none';
     }
 
     // --- GESTIÓN DE PANTALLA ACTIVA (WAKE LOCK API) ---
@@ -17925,13 +18346,12 @@
       const videoEl = document.querySelector('#reader video');
       if (!videoEl) return;
 
-      // Verificación 1: Track de video silenciado o cancelado por ahorro de energía del celular
       if (videoEl.srcObject && typeof videoEl.srcObject.getVideoTracks === 'function') {
         const tracks = videoEl.srcObject.getVideoTracks();
         if (tracks.length > 0) {
           const track = tracks[0];
           if (track.readyState === 'ended' || track.muted) {
-            console.warn("Watchdog: Track de cámara finalizado/silenciado por el SO. Reiniciando...");
+            console.warn("Watchdog: Track silenciado. Reconectando...");
             actualizarMensajeCamara("⚠️ Sensor pausado por el sistema. Reconectando...");
             forzarReinicioCamara();
             return;
@@ -17939,14 +18359,12 @@
         }
       }
 
-      // Verificación 2: El frame del video dejó de avanzar (currentTime no varía)
       const current = videoEl.currentTime;
       if (current > 0) {
         if (current === ultimoTiempoVideo) {
           contadorCongelamiento++;
-          // 2 ciclos consecutivos congelado (~2.4 a 3 segundos de inactividad de frames)
           if (contadorCongelamiento >= 2) {
-            console.warn(`Watchdog: Cámara congelada detectada (currentTime = ${current}s). Reiniciando...`);
+            console.warn(`Watchdog: Cámara congelada. Reiniciando...`);
             actualizarMensajeCamara("⚠️ Imagen congelada detectada. Reiniciando cámara...");
             forzarReinicioCamara();
             return;
@@ -17960,9 +18378,7 @@
 
     function actualizarMensajeCamara(msg) {
       const el = document.getElementById('camera-status-msg');
-      if (el) {
-        el.innerText = msg;
-      }
+      if (el) el.innerText = msg;
     }
 
     // --- CICLO DE VIDA DE CÁMARA Y REINICIO LIMPIO ---
@@ -17971,6 +18387,11 @@
       
       const container = document.getElementById('reader-container');
       if (container && container.style.display === 'none') return;
+
+      if (typeof Html5Qrcode === 'undefined') {
+        actualizarMensajeCamara("⚠️ Librería de cámara no disponible. Recarga la página.");
+        return;
+      }
 
       solicitarWakeLock();
       actualizarMensajeCamara("Iniciando cámara...");
@@ -18003,22 +18424,27 @@
       actualizarMensajeCamara("🔄 Restableciendo cámara...");
 
       try {
-        if (html5QrCode) {
-          try {
-            await html5QrCode.stop();
-          } catch (e) {
-            console.warn("html5QrCode.stop advertencia:", e);
+        // Liberar explícitamente pistas de video a nivel hardware
+        const videoEl = document.querySelector('#reader video');
+        if (videoEl && videoEl.srcObject) {
+          const stream = videoEl.srcObject;
+          if (typeof stream.getTracks === 'function') {
+            stream.getTracks().forEach(track => {
+              try { track.stop(); } catch (e) {}
+            });
           }
-          try {
-            html5QrCode.clear();
-          } catch (e) {}
+          videoEl.srcObject = null;
+        }
+
+        if (html5QrCode) {
+          try { await html5QrCode.stop(); } catch (e) {}
+          try { html5QrCode.clear(); } catch (e) {}
           html5QrCode = null;
         }
       } catch (e) {
-        console.warn("Error liberando instancia de cámara:", e);
+        console.warn("Error liberando cámara:", e);
       } finally {
         camaraActiva = false;
-        // Pausa breve para permitir al hardware liberar el dispositivo antes de volver a solicitarlo
         setTimeout(async () => {
           reiniciandoCamara = false;
           await iniciarCamara();
@@ -18043,34 +18469,27 @@
     }
 
     function onScanSuccess(decodedText) {
-      // Limpieza de caracteres invisibles o errores de lectura
       const codigoLimpio = String(decodedText).trim();
-      const productoEncontrado = buscarProducto(codigoLimpio);
-
-      if (productoEncontrado) {
-        productoActual = productoEncontrado;
-        cantidadSeleccionada = 1;
-
-        detenerCamaraYEjecutar(() => {
-          mostrarProducto(productoActual);
-        });
-      } else {
-        alert("Código no registrado: " + codigoLimpio);
-      }
+      detenerCamaraYEjecutar(() => {
+        procesarYEscanearProducto(codigoLimpio);
+      });
     }
 
-    function mostrarProducto(prod) {
+    function mostrarProducto(prod, estado = 'offline') {
       document.getElementById('reader-container').style.display = 'none';
+      const sBox = document.getElementById('search-container');
+      if (sBox) sBox.style.display = 'none';
       document.getElementById('result-view').style.display = 'block';
       document.getElementById('step-image').style.display = 'block';
       document.getElementById('step-label').style.display = 'none';
+      ocultarPantallasEspeciales();
 
       const btnAdd = document.getElementById('btn-add-main');
       btnAdd.disabled = false;
       btnAdd.innerText = "🛒 Agregar al changuito";
       btnAdd.style.background = "#008744";
 
-      // Fase 1: Foto (en productos pesables mostramos el peso de la bolsa)
+      // Fase 1: Foto
       document.getElementById('step1-name').innerText = prod.esPesable
         ? `${prod.nombre} (${prod.pesoTexto})`
         : prod.nombre;
@@ -18078,7 +18497,6 @@
 
       // Fase 2: Etiqueta Oficial
       document.getElementById('lbl-title').innerText = prod.nombre;
-      document.getElementById('lbl-price').innerText = formatearMoneda(prod.precioCalculado);
 
       if (prod.esPesable) {
         document.getElementById('lbl-tax').innerText = `PESO: ${prod.pesoTexto} — PRECIO X KG: ${formatearMoneda(prod.precioOriginal)}`;
@@ -18088,11 +18506,222 @@
         document.getElementById('lbl-sub').innerText = prod.detalleUnidad;
       }
 
+      actualizarEtiquetaPrecioUI(prod);
+      actualizarBadgesFuente(estado);
       actualizarSubtotalUI();
 
+      clearTimeout(timerTransition);
       timerTransition = setTimeout(() => {
         mostrarEtiquetaDirecto();
       }, 2000);
+    }
+
+    function actualizarEtiquetaPrecioUI(prod) {
+      const lblPrice = document.getElementById('lbl-price');
+      const regBox = document.getElementById('lbl-price-regular-box');
+      const regPrice = document.getElementById('lbl-price-regular');
+      const condEl = document.getElementById('lbl-promo-cond');
+      const badgePromo = document.getElementById('lbl-badge-promo');
+      const step1BadgePromo = document.getElementById('step1-badge-promo');
+
+      if (prod.promo && prod.promo.tienePromo) {
+        if (regBox && regPrice) {
+          regBox.style.display = 'block';
+          regPrice.innerText = formatearMoneda(prod.precioOriginal || prod.precioLista || prod.promo.precioRegular);
+        }
+        lblPrice.innerText = formatearMoneda(prod.precioCalculado);
+        lblPrice.style.color = '#d31319';
+
+        if (condEl) {
+          let t = '';
+          if (prod.promo.condicion) t += `Condición: ${prod.promo.condicion}. `;
+          if (prod.promo.comentarios) t += prod.promo.comentarios;
+          condEl.innerText = t;
+          condEl.style.display = t ? 'block' : 'none';
+        }
+
+        const tagText = (prod.promo.esComunidad ? '🏷️ Comunidad: ' : '🔥 ') + prod.promo.textoPromo;
+        if (badgePromo) {
+          badgePromo.innerText = tagText;
+          badgePromo.style.background = prod.promo.esComunidad ? '#f57c00' : '#d31319';
+          badgePromo.style.display = 'inline-block';
+        }
+        if (step1BadgePromo) {
+          step1BadgePromo.innerText = tagText;
+          step1BadgePromo.style.background = prod.promo.esComunidad ? '#f57c00' : '#d31319';
+          step1BadgePromo.style.display = 'inline-block';
+        }
+      } else {
+        if (regBox) regBox.style.display = 'none';
+        if (condEl) condEl.style.display = 'none';
+        if (badgePromo) badgePromo.style.display = 'none';
+        if (step1BadgePromo) step1BadgePromo.style.display = 'none';
+        lblPrice.innerText = formatearMoneda(prod.precioCalculado);
+        lblPrice.style.color = '#111';
+      }
+    }
+
+    // --- BÚSQUEDA MANUAL POR TEXTO O CÓDIGO ---
+    async function buscarProductosTexto() {
+      const input = document.getElementById('search-input');
+      const q = input.value.trim();
+      if (!q) return;
+
+      const resultsContainer = document.getElementById('search-results-list');
+      const loadingEl = document.getElementById('search-loading');
+      document.getElementById('btn-clear-search').style.display = 'block';
+
+      loadingEl.style.display = 'block';
+      resultsContainer.style.display = 'none';
+      resultsContainer.innerHTML = '';
+
+      // Si es un código numérico EAN o PLU
+      if (/^\d{4,14}$/.test(q)) {
+        loadingEl.style.display = 'none';
+        limpiarBusquedaTexto();
+        detenerCamaraYEjecutar(() => {
+          procesarYEscanearProducto(q);
+        });
+        return;
+      }
+
+      let listaEncontrados = [];
+
+      // 1. Buscar online en Constructor.io de Coto
+      try {
+        const url = `https://ac.cnstrc.com/search/${encodeURIComponent(q)}?key=${COTO_API_KEY}&c=ciojs-client-2.1468.0&num_results_per_page=6`;
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          const results = data?.response?.results || [];
+          results.forEach(r => {
+            const dt = r.data || {};
+            const prices = dt.price || [];
+            let pStore = prices.find(p => String(p.store) === '200') || (prices.length > 0 ? prices[0] : null);
+            if (!pStore || !pStore.listPrice) return;
+
+            const listPrice = Number(pStore.listPrice) || 0;
+            const priceNoTax = Number(pStore.priceWithoutTax) || Math.round((listPrice / 1.21) * 100) / 100;
+            const unitPrice = Number(pStore.formatPrice) || listPrice;
+            const formatStr = dt.product_format || 'Unidad';
+            const unitLabel = parsearUnidad(formatStr);
+            const imgUrl = dt.image_url || dt.product_large_image_url || 'Logo de Coto.png';
+            const name = (r.value || dt.description || 'Producto Coto').trim();
+            const ean = dt.product_main_ean || dt.sku_id || '';
+
+            const promo = extraerPromoDeResultado(r);
+            const precioEfectivo = (promo && promo.precioOferta && promo.precioOferta > 0) ? promo.precioOferta : listPrice;
+
+            listaEncontrados.push({
+              codigo: ean,
+              nombre: name,
+              precioOriginal: listPrice,
+              precioCalculado: precioEfectivo,
+              sinImpuestos: `PRECIO SIN IMPUESTOS NACIONALES: $ ${format_ar(priceNoTax)}`,
+              detalleUnidad: `PRECIO X ${unitLabel}: $ ${format_ar(unitPrice)}`,
+              imagen: imgUrl,
+              esOnline: true,
+              promo: promo
+            });
+          });
+        }
+      } catch (err) {
+        console.warn("Búsqueda online falló, usando catálogo local:", err);
+      }
+
+      // 2. Si no hay internet o pocos resultados, complementar con local y caché
+      if (listaEncontrados.length === 0) {
+        const qLower = q.toLowerCase();
+        const fuentes = [catalogoCache, DB_PRODUCTOS];
+        for (const fuente of fuentes) {
+          for (const [ean, prod] of Object.entries(fuente)) {
+            if (prod.nombre && prod.nombre.toLowerCase().includes(qLower)) {
+              if (!listaEncontrados.some(x => x.codigo === ean)) {
+                listaEncontrados.push({
+                  ...prod,
+                  codigo: ean,
+                  precioOriginal: prod.precioOriginal || prod.precioLista || prod.precio,
+                  precioCalculado: prod.precio,
+                  esOnline: false,
+                  promo: prod.promo || null
+                });
+              }
+            }
+            if (listaEncontrados.length >= 8) break;
+          }
+          if (listaEncontrados.length >= 8) break;
+        }
+      }
+
+      loadingEl.style.display = 'none';
+      renderizarResultadosBusqueda(listaEncontrados);
+    }
+
+    function renderizarResultadosBusqueda(lista) {
+      const container = document.getElementById('search-results-list');
+      container.innerHTML = '';
+      container.style.display = 'block';
+
+      if (lista.length === 0) {
+        container.innerHTML = '<div style="font-size:0.8rem; color:#888; text-align:center; padding:10px;">No se encontraron productos coincidentes.</div>';
+        return;
+      }
+
+      lista.forEach(prod => {
+        const div = document.createElement('div');
+        div.className = 'search-result-item';
+
+        let precioHtml = '';
+        if (prod.promo && prod.promo.tienePromo) {
+          precioHtml = `
+            <span class="price-regular-cut">${formatearMoneda(prod.precioOriginal)}</span>
+            <span style="font-weight:900; color:#d31319; font-size:1rem;">${formatearMoneda(prod.precioCalculado)}</span>
+            <span class="badge-promo" style="background:${prod.promo.esComunidad ? '#f57c00' : '#d31319'};">🔥 ${prod.promo.textoPromo}</span>
+          `;
+        } else {
+          precioHtml = `<span style="font-weight:900; color:#111; font-size:1rem;">${formatearMoneda(prod.precioCalculado)}</span>`;
+        }
+
+        div.innerHTML = `
+          <img src="${prod.imagen}" alt="" onerror="this.onerror=null; this.src='Logo de Coto.png';" style="width:40px; height:40px; object-fit:contain; border-radius:6px; background:#f8f9fa; flex-shrink:0;">
+          <div style="flex:1; min-width:0;">
+            <div style="font-size:0.85rem; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${prod.nombre}</div>
+            <div style="display:flex; align-items:center; gap:6px; margin-top:2px;">
+              ${precioHtml}
+            </div>
+          </div>
+          <span style="font-size:0.75rem; color:#888; margin-left:4px;">Ver ▶</span>
+        `;
+
+        div.onclick = () => {
+          seleccionarProductoDeBusqueda(prod);
+        };
+
+        container.appendChild(div);
+      });
+    }
+
+    function seleccionarProductoDeBusqueda(prod) {
+      limpiarBusquedaTexto();
+      detenerCamaraYEjecutar(() => {
+        productoActual = { ...prod };
+        cantidadSeleccionada = 1;
+        mostrarProducto(productoActual, prod.esOnline ? 'online' : 'offline');
+      });
+    }
+
+    function limpiarBusquedaTexto() {
+      const input = document.getElementById('search-input');
+      if (input) input.value = '';
+      const list = document.getElementById('search-results-list');
+      if (list) {
+        list.innerHTML = '';
+        list.style.display = 'none';
+      }
+      const clearBtn = document.getElementById('btn-clear-search');
+      if (clearBtn) clearBtn.style.display = 'none';
+      const loading = document.getElementById('search-loading');
+      if (loading) loading.style.display = 'none';
     }
 
     function mostrarEtiquetaDirecto() {
@@ -18151,7 +18780,9 @@
         nombre: descItem,
         precioUnitario: productoActual.precioCalculado,
         cantidad: cantidadSeleccionada,
-        subtotal: productoActual.precioCalculado * cantidadSeleccionada
+        subtotal: productoActual.precioCalculado * cantidadSeleccionada,
+        esOnline: !!productoActual.esOnline,
+        promo: productoActual.promo || null
       });
       guardarCarritoEnStorage();
       actualizarCarritoUI();
@@ -18168,19 +18799,32 @@
     function actualizarCarritoUI() {
       const totalItems = carrito.reduce((sum, item) => sum + item.cantidad, 0);
       const totalMonto = carrito.reduce((sum, item) => sum + item.subtotal, 0);
+      const tieneOffline = carrito.some(it => !it.esOnline);
 
       document.getElementById('cart-count-txt').innerText = `${totalItems} productos en total`;
       document.getElementById('cart-total-txt').innerText = formatearMoneda(totalMonto);
       document.getElementById('modal-total').innerText = formatearMoneda(totalMonto);
+
+      const warnOffline = document.getElementById('cart-offline-warn');
+      if (warnOffline) {
+        warnOffline.style.display = tieneOffline ? 'block' : 'none';
+      }
 
       const lista = document.getElementById('cart-items-list');
       lista.innerHTML = "";
       carrito.forEach(item => {
         const li = document.createElement('li');
         li.className = "cart-item";
+        let promoTag = '';
+        if (item.promo && item.promo.textoPromo) {
+          promoTag = `<span style="color:#d31319; font-size:0.68rem; background:#fee8e8; padding:1px 6px; border-radius:4px; margin-left:4px; font-weight:700;">🔥 ${item.promo.textoPromo}</span>`;
+        }
+        const badgeItem = item.esOnline
+          ? `<span style="color:#137333; font-size:0.68rem; background:#e6f4ea; padding:1px 6px; border-radius:4px; margin-left:4px; font-weight:600;">🟢 En vivo</span>`
+          : `<span style="color:#c5221f; font-size:0.68rem; background:#fce8e6; padding:1px 6px; border-radius:4px; margin-left:4px; font-weight:bold;">⚠️ Offline</span>`;
         li.innerHTML = `
           <div>
-            <div><b>${item.cantidad}x</b> ${item.nombre}</div>
+            <div><b>${item.cantidad}x</b> ${item.nombre} ${promoTag} ${badgeItem}</div>
             <small style="color:#666;">${formatearMoneda(item.precioUnitario)} c/u = <b>${formatearMoneda(item.subtotal)}</b></small>
           </div>
           <button class="btn-remove" onclick="eliminarDelCarrito(${item.id})">✕</button>
@@ -18216,7 +18860,11 @@
     function reiniciarEscaneo() {
       clearTimeout(timerTransition);
       document.getElementById('result-view').style.display = 'none';
+      document.getElementById('step-loading').style.display = 'none';
+      document.getElementById('step-notfound').style.display = 'none';
       document.getElementById('reader-container').style.display = 'block';
+      const sBox = document.getElementById('search-container');
+      if (sBox) sBox.style.display = 'block';
       iniciarCamara();
     }
 
@@ -18236,6 +18884,7 @@
     });
 
     window.addEventListener('DOMContentLoaded', () => {
+      cargarCatalogoCache();
       cargarCarritoGuardado();
       iniciarCamara();
     });
