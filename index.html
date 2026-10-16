@@ -12,7 +12,15 @@
     
     header { width: 100%; max-width: 420px; display: flex; flex-direction: column; align-items: center; gap: 8px; margin-bottom: 12px; }
     .logo-header { height: 40px; object-fit: contain; }
-    .store-badge { background: #d31319; color: #fff; padding: 4px 14px; border-radius: 18px; font-size: 0.8rem; font-weight: bold; }
+    .store-badge { background: #d31319; color: #fff; padding: 4px 14px; border-radius: 18px; font-size: 0.8rem; font-weight: bold; border: none; cursor: pointer; }
+    .store-ref { font-size: 0.7rem; color: #b26a00; font-weight: 600; text-align: center; }
+
+    /* Selector de Sucursal */
+    #sucursal-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 300; justify-content: center; align-items: center; padding: 16px; }
+    .sucursal-content { background: #fff; width: 100%; max-width: 420px; border-radius: 14px; padding: 18px; }
+    .sucursal-opcion { display: block; width: 100%; text-align: left; background: #f8f9fa; border: 1.5px solid #dee2e6; border-radius: 10px; padding: 10px 12px; margin-top: 8px; cursor: pointer; font-size: 0.9rem; }
+    .sucursal-opcion.activa { border-color: #d31319; background: #fff5f5; }
+    .sucursal-opcion small { display: block; color: #666; font-size: 0.75rem; margin-top: 2px; }
     
     #reader-container { width: 100%; max-width: 420px; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.08); padding: 10px; }
     #reader { width: 100%; border-radius: 8px; overflow: hidden; background: #000; min-height: 240px; }
@@ -69,7 +77,8 @@
 
   <header>
     <img class="logo-header" src="Logo de Coto.png" alt="COTO">
-    <div id="sucursal-tag" class="store-badge">Cargando sucursal...</div>
+    <button id="sucursal-tag" class="store-badge" type="button" onclick="abrirSelectorSucursal()" title="Cambiar sucursal">Cargando sucursal...</button>
+    <div id="sucursal-ref" class="store-ref" style="display:none;"></div>
     <div style="font-size:0.7rem; color:#6c757d; margin-top:2px; font-weight:500;">v1.5 • Precios en Vivo & Respaldo Offline</div>
   </header>
 
@@ -202,10 +211,94 @@
     </div>
   </div>
 
+  <!-- Modal Selector de Sucursal -->
+  <div id="sucursal-modal">
+    <div class="sucursal-content">
+      <h3 style="margin: 0; font-size: 1.05rem;">📍 Elegí la sucursal</h3>
+      <div id="sucursal-opciones"></div>
+      <button class="btn-close-cart" onclick="cerrarSelectorSucursal()">Cerrar</button>
+    </div>
+  </div>
+
   <script>
 
+    // --- SUCURSALES DISPONIBLES ---
+    // codigoOnline: código de la sucursal en la API de Coto (3 dígitos).
+    // referencia: sucursal cuya lista de precios se usa si la propia no está publicada online.
+    // Verificado 16/10/2026: 044 y 068 no tienen lista de precios en la API; 181 y 188 tienen los mismos precios que la 200.
+    const SUCURSALES = [
+      { id: '44', nombre: 'Belgrano', direccion: 'Av. Monroe 3284', codigoOnline: '044', referencia: { codigo: '181', nombre: 'Saavedra' } },
+      { id: '68', nombre: 'Lomas de San Isidro', direccion: 'Jorge Newbery 555', codigoOnline: '068', referencia: { codigo: '188', nombre: 'Munro' } },
+      { id: '200', nombre: 'Coto Digital', direccion: 'Precios de la tienda online', codigoOnline: '200', referencia: null }
+    ];
+    const STORAGE_SUCURSAL_KEY = "coto_sucursal_v1";
+
     const params = new URLSearchParams(window.location.search);
-    document.getElementById('sucursal-tag').innerText = "📍 " + (params.get('sucursal') || "Coto, suc Palermo");
+    let sucursalActual = null;
+
+    function obtenerSucursalInicial() {
+      const deUrl = SUCURSALES.find(s => s.id === String(params.get('sucursal') || '').replace(/^0+/, ''));
+      if (deUrl) return deUrl;
+      const guardada = SUCURSALES.find(s => s.id === localStorage.getItem(STORAGE_SUCURSAL_KEY));
+      return guardada || null;
+    }
+
+    // Devuelve el precio de la sucursal actual, o el de su sucursal de referencia si no está publicada online
+    function precioDeSucursal(prices) {
+      const suc = sucursalActual || SUCURSALES.find(s => s.id === '200');
+      const propio = prices.find(p => String(p.store) === suc.codigoOnline);
+      if (propio) return propio;
+      if (suc.referencia) {
+        const ref = prices.find(p => String(p.store) === suc.referencia.codigo);
+        if (ref) return ref;
+      }
+      return prices.find(p => String(p.store) === '200') || (prices.length > 0 ? prices[0] : null);
+    }
+
+    function claveCacheSucursal() {
+      return STORAGE_CACHE_KEY + "_suc" + (sucursalActual ? sucursalActual.id : '200');
+    }
+
+    function actualizarEtiquetaSucursal() {
+      const tag = document.getElementById('sucursal-tag');
+      const ref = document.getElementById('sucursal-ref');
+      if (!sucursalActual) {
+        tag.innerText = "📍 Elegir sucursal ▾";
+        ref.style.display = 'none';
+        return;
+      }
+      tag.innerText = `📍 Suc. ${sucursalActual.id} · ${sucursalActual.nombre} ▾`;
+      if (sucursalActual.referencia) {
+        ref.innerText = `Sin precios online propios · se usan los de Suc. ${Number(sucursalActual.referencia.codigo)} ${sucursalActual.referencia.nombre}`;
+        ref.style.display = 'block';
+      } else {
+        ref.style.display = 'none';
+      }
+    }
+
+    function seleccionarSucursal(id) {
+      const suc = SUCURSALES.find(s => s.id === id);
+      if (!suc) return;
+      sucursalActual = suc;
+      localStorage.setItem(STORAGE_SUCURSAL_KEY, suc.id);
+      catalogoCache = {};
+      cargarCatalogoCache();
+      actualizarEtiquetaSucursal();
+      cerrarSelectorSucursal();
+    }
+
+    function abrirSelectorSucursal() {
+      document.getElementById('sucursal-opciones').innerHTML = SUCURSALES.map(s => `
+        <button type="button" class="sucursal-opcion ${sucursalActual && sucursalActual.id === s.id ? 'activa' : ''}" onclick="seleccionarSucursal('${s.id}')">
+          <b>Suc. ${s.id} · ${s.nombre}</b>
+          <small>${s.direccion}${s.referencia ? ` · precios de ref.: Suc. ${Number(s.referencia.codigo)} ${s.referencia.nombre}` : ''}</small>
+        </button>`).join('');
+      document.getElementById('sucursal-modal').style.display = 'flex';
+    }
+
+    function cerrarSelectorSucursal() {
+      document.getElementById('sucursal-modal').style.display = 'none';
+    }
 
     // Catálogo offline de 2.520 productos cargado desde productos.js
     if (typeof DB_PRODUCTOS === "undefined") { window.DB_PRODUCTOS = {}; }
@@ -259,7 +352,7 @@
     // --- GESTIÓN DE CACHÉ LOCAL DEL CELULAR (SMART CACHE) ---
     function cargarCatalogoCache() {
       try {
-        const raw = localStorage.getItem(STORAGE_CACHE_KEY);
+        const raw = localStorage.getItem(claveCacheSucursal());
         if (raw) catalogoCache = JSON.parse(raw);
       } catch (e) {
         console.warn("Error leyendo caché de productos:", e);
@@ -278,7 +371,7 @@
           promo: prod.promo || null,
           timestamp: Date.now()
         };
-        localStorage.setItem(STORAGE_CACHE_KEY, JSON.stringify(catalogoCache));
+        localStorage.setItem(claveCacheSucursal(), JSON.stringify(catalogoCache));
       } catch (e) {
         console.warn("Error guardando en caché:", e);
       }
@@ -457,7 +550,7 @@
 
         const dt = rMatch.data || {};
         const prices = dt.price || [];
-        let pStore = prices.find(p => String(p.store) === '200') || (prices.length > 0 ? prices[0] : null);
+        let pStore = precioDeSucursal(prices);
         if (!pStore || !pStore.listPrice) return null;
 
         const listPrice = Number(pStore.listPrice) || 0;
@@ -959,7 +1052,7 @@
           results.forEach(r => {
             const dt = r.data || {};
             const prices = dt.price || [];
-            let pStore = prices.find(p => String(p.store) === '200') || (prices.length > 0 ? prices[0] : null);
+            let pStore = precioDeSucursal(prices);
             if (!pStore || !pStore.listPrice) return;
 
             const listPrice = Number(pStore.listPrice) || 0;
@@ -1246,6 +1339,9 @@
     });
 
     window.addEventListener('DOMContentLoaded', () => {
+      sucursalActual = obtenerSucursalInicial();
+      actualizarEtiquetaSucursal();
+      if (!sucursalActual) abrirSelectorSucursal();
       cargarCatalogoCache();
       cargarCarritoGuardado();
       iniciarCamara();
